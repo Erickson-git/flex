@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-ink-900 text-zinc-100 font-sans antialiased;
+  background-image: radial-gradient(120% 90% at 50% -10%, #16161a 0%, #0a0a0a 55%, #050505 100%);
+  background-attachment: fixed;
+  overscroll-behavior-y: none;
+}
+
+/* Respecte les encoches / barres système (PWA plein écran) */
+.safe-top {
+  padding-top: max(env(safe-area-inset-top), 0.5rem);
+}
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+}
+
+/* Scrollbar discrète */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+@layer components {
+  /* Or vivant : dégradé qui scintille lentement façon métal précieux */
+  .text-gold-grad {
+    background-image: linear-gradient(110deg, #ffe0a3 0%, #f7b733 35%, #fff3d6 50%, #f7b733 65%, #ff7a18 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer 6s linear infinite;
+  }
+  /* Verre fumé haut de gamme : liseré or subtil + profondeur interne */
+  .glass {
+    @apply border border-white/10 bg-white/[0.035] backdrop-blur-2xl;
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
+      inset 0 0 0 1px rgba(247, 183, 51, 0.04),
+      0 8px 32px -12px rgba(0, 0, 0, 0.7);
+  }
+  /* Bouton or : reflet supérieur + pression veloutée */
+  .btn-gold {
+    @apply relative overflow-hidden rounded-2xl bg-gold-grad px-6 py-3.5 font-semibold
+           text-ink-900 shadow-glow transition-all duration-200 active:scale-[0.97];
+  }
+  .btn-gold::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 50% 0;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.35), transparent);
+    pointer-events: none;
+  }
+  .input-luxe {
+    @apply w-full rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 text-lg
+           text-white placeholder:text-zinc-500 outline-none transition
+           focus:border-gold/60 focus:bg-white/[0.06] focus:shadow-glow;
+  }
+  /* Fin filet doré pour séparer les sections avec élégance */
+  .hairline-gold {
+    height: 1px;
+    background: linear-gradient(to right, transparent, rgba(247, 183, 51, 0.4), transparent);
+  }
+}
+
+/* ── Desktop / Web : ambiance premium centrée ──────────────────
+   L'app reste une colonne mobile-first (max-w-lg) ; sur grand écran on
+   enrichit l'arrière-plan pour un rendu vitrine haut de gamme. */
+@media (min-width: 1024px) {
+  body {
+    background-image:
+      radial-gradient(60% 80% at 50% -5%, rgba(247, 183, 51, 0.06) 0%, transparent 60%),
+      radial-gradient(120% 90% at 50% -10%, #16130d 0%, #0a0807 55%, #050505 100%);
+  }
+  /* fins rails lumineux de part et d'autre de la colonne centrale */
+  #root::before,
+  #root::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: linear-gradient(to bottom, transparent, rgba(247, 183, 51, 0.18), transparent);
+    pointer-events: none;
+    z-index: 30;
+  }
+  #root::before {
+    left: calc(50% - 256px);
+  }
+  #root::after {
+    right: calc(50% - 256px);
+  }
+}
+
+/* Grain léger pour le côté "luxueux / club" */
+.grain::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  z-index: 1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}

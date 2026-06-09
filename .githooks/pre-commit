@@ -1,0 +1,46 @@
+#!/bin/sh
+# ─────────────────────────────────────────────────────────────
+# FLEX — pre-commit : scanner anti-fuite de secrets.
+# Bloque le commit si une clé/API/mot de passe ou un .env est détecté.
+# Activation : git config core.hooksPath .githooks
+# ─────────────────────────────────────────────────────────────
+
+RED='\033[0;31m'; YEL='\033[0;33m'; NC='\033[0m'
+fail=0
+
+# 1) Interdire tout fichier d'environnement réel (sauf .env.example)
+staged=$(git diff --cached --name-only)
+for f in $staged; do
+  case "$f" in
+    .env|.env.*)
+      if [ "$f" != ".env.example" ]; then
+        echo "${RED}✖ Refus : tentative de commit de $f (secret d'environnement).${NC}"
+        fail=1
+      fi
+      ;;
+  esac
+done
+
+# 2) Scanner le CONTENU indexé à la recherche de signatures de secrets.
+#    On cible des VALEURS de secret réelles (pas la simple mention en prose).
+patterns='sb_secret_[A-Za-z0-9]{8,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}|(password|passwd|secret|api[_-]?key|access[_-]?token)\s*[:=]\s*["'\''][^"'\'' ]{12,}'
+
+# Diff ajouté uniquement (lignes commençant par +), hors fichiers de doc d'exemple
+hits=$(git diff --cached --unified=0 -- . ':(exclude).env.example' ':(exclude).githooks/pre-commit' \
+        | grep -E '^\+' \
+        | grep -nEi "$patterns")
+
+if [ -n "$hits" ]; then
+  echo "${RED}✖ Secret potentiel détecté dans les modifications indexées :${NC}"
+  echo "$hits" | sed 's/^/   /'
+  fail=1
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo ""
+  echo "${YEL}Commit bloqué par le scanner de sécurité FLEX.${NC}"
+  echo "Retire le secret, ou (si faux positif) commit avec --no-verify en connaissance de cause."
+  exit 1
+fi
+
+exit 0

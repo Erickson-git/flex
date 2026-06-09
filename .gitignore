@@ -1,0 +1,37 @@
+# ─────────────────────────────────────────────────────────────
+# FLEX — fichiers exclus du dépôt
+# ─────────────────────────────────────────────────────────────
+
+# Dépendances & builds
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.tsbuildinfo
+
+# Secrets & environnement (NE JAMAIS committer)
+.env
+.env.*
+!.env.example
+*.local
+*.key
+*.pem
+secrets*.json
+service-role*.txt
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# OS / éditeurs
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Divers
+coverage/
+.cache/
