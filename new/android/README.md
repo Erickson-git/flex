@@ -38,10 +38,16 @@ npm run mobile:sync      # copie l'app web dedans
 
 ### 2) Construire l'APK sur GitHub (gratuit)
 1. Pousse le code sur GitHub.
-2. Onglet **Actions** → workflow **« Build Android APK (gratuit) »** → **Run workflow**.
-   *(Ou pousse un tag `v1.0.0` → la build se lance toute seule.)*
-3. À la fin, télécharge l'artefact **`flex-android-apk`** → `app-debug.apk`.
-4. Envoie l'APK sur ton téléphone et installe-le (« Sources inconnues »).
+2. **Le plus simple — pousse un tag** : `git tag v1.0.0 && git push origin v1.0.0`.
+   → la build se lance, crée une **Release** et y attache **`flex.apk`**.
+   → le bouton « Télécharger l'APK » de l'app fonctionne alors **tout seul**
+     (URL stable `…/releases/latest/download/flex.apk`).
+3. (Ou) Onglet **Actions** → **« Build Android APK »** → **Run workflow** → télécharge
+   l'artefact **`flex-android-apk`**.
+4. Installe l'APK sur ton téléphone (« Sources inconnues »).
+
+> Pour une version **signée Play Store**, pousse plutôt un tag `release-1.0.0`
+> (workflow Méthode C) : il publie une Release avec `flex.apk` signé + `flex.aab`.
 
 > Le fichier de build est déjà là : `.github/workflows/build-android.yml`.
 > Pense à mettre tes secrets `VITE_*` dans GitHub (voir `new/README.md`).

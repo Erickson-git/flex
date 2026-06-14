@@ -22,6 +22,9 @@ on:
   push:
     tags: ['release-*']
 
+permissions:
+  contents: write # nécessaire pour créer la Release
+
 jobs:
   build-signed:
     runs-on: ubuntu-latest
@@ -86,14 +89,32 @@ jobs:
         env:
           BUILD_TOOLS_VERSION: '34.0.0'
 
+      - name: Renommer en noms stables (flex.apk / flex.aab)
+        run: |
+          cp "${{ steps.sign-apk.outputs.signedReleaseFile }}" flex.apk
+          cp "${{ steps.sign-aab.outputs.signedReleaseFile }}" flex.aab
+
       - name: Publier l'APK signé (installation directe)
         uses: actions/upload-artifact@v4
         with:
           name: flex-android-apk-signe
-          path: ${{ steps.sign-apk.outputs.signedReleaseFile }}
+          path: flex.apk
 
       - name: Publier l'AAB signé (à envoyer au Play Store)
         uses: actions/upload-artifact@v4
         with:
           name: flex-android-aab-playstore
-          path: ${{ steps.sign-aab.outputs.signedReleaseFile }}
+          path: flex.aab
+
+      # Sur un tag (ex. release-1.0.0) : Release publique avec l'APK signé
+      # → bouton de téléchargement (.../releases/latest/download/flex.apk).
+      - name: Publier la Release GitHub (APK signé)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            flex.apk
+            flex.aab
+          name: FLEX ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body: 'APK signé installable + AAB pour le Google Play Store.'

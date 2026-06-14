@@ -7,9 +7,9 @@
 //    Laisse vide ('') tant que ce n'est pas dispo → on proposera la PWA.
 // ─────────────────────────────────────────────────────────────
 
-/** APK Android téléchargeable (Release GitHub). */
+/** APK Android téléchargeable (dernière Release GitHub — nom de fichier stable). */
 export const ANDROID_APK_URL =
-  'https://github.com/Erickson-git/flex/releases/latest/download/app-debug.apk'
+  'https://github.com/Erickson-git/flex/releases/latest/download/flex.apk'
 
 /** Lien App Store / TestFlight (vide = pas encore publié → on propose la PWA). */
 export const IOS_APP_URL = ''
