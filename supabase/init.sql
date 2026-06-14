@@ -216,41 +216,63 @@ returns boolean language sql security definer stable set search_path = public as
 $$;
 
 -- ── PROFILES ────────────────────────────────────────────────────
+drop policy if exists "profiles_select_all" on public.profiles;
 create policy "profiles_select_all"   on public.profiles for select using (true);
+drop policy if exists "profiles_insert_self" on public.profiles;
 create policy "profiles_insert_self"  on public.profiles for insert with check (auth.uid() = id);
+drop policy if exists "profiles_update_self" on public.profiles;
 create policy "profiles_update_self"  on public.profiles for update using (auth.uid() = id) with check (auth.uid() = id);
 
 -- ── POSTS : lecture selon visibilité, écriture = auteur ─────────
+drop policy if exists "posts_select_visible" on public.posts;
 create policy "posts_select_visible" on public.posts for select using (
   visibility = 'public'
   or author_id = auth.uid()
   or (visibility = 'followers' and public.is_following(author_id))
 );
+drop policy if exists "posts_insert_self" on public.posts;
 create policy "posts_insert_self" on public.posts for insert with check (auth.uid() = author_id);
+drop policy if exists "posts_update_self" on public.posts;
 create policy "posts_update_self" on public.posts for update using (auth.uid() = author_id) with check (auth.uid() = author_id);
+drop policy if exists "posts_delete_self" on public.posts;
 create policy "posts_delete_self" on public.posts for delete using (auth.uid() = author_id);
 
 -- ── LIKES : lecture publique, (dé)like par soi-même ─────────────
+drop policy if exists "likes_select_all" on public.post_likes;
 create policy "likes_select_all"  on public.post_likes for select using (true);
+drop policy if exists "likes_insert_self" on public.post_likes;
 create policy "likes_insert_self" on public.post_likes for insert with check (auth.uid() = user_id);
+drop policy if exists "likes_delete_self" on public.post_likes;
 create policy "likes_delete_self" on public.post_likes for delete using (auth.uid() = user_id);
 
 -- ── COMMENTS : lecture connectée, écriture = auteur ─────────────
+drop policy if exists "comments_select_auth" on public.comments;
 create policy "comments_select_auth" on public.comments for select using (auth.role() = 'authenticated');
+drop policy if exists "comments_insert_self" on public.comments;
 create policy "comments_insert_self" on public.comments for insert with check (auth.uid() = author_id);
+drop policy if exists "comments_delete_self" on public.comments;
 create policy "comments_delete_self" on public.comments for delete using (auth.uid() = author_id);
 
 -- ── FOLLOWS : lecture publique, gérés par le follower ───────────
+drop policy if exists "follows_select_all" on public.follows;
 create policy "follows_select_all"  on public.follows for select using (true);
+drop policy if exists "follows_insert_self" on public.follows;
 create policy "follows_insert_self" on public.follows for insert with check (auth.uid() = follower_id);
+drop policy if exists "follows_delete_self" on public.follows;
 create policy "follows_delete_self" on public.follows for delete using (auth.uid() = follower_id);
 
 -- ═══════════════════════════════════════════════════════════════
 --  REALTIME (optionnel : fil & interactions en direct)
 -- ═══════════════════════════════════════════════════════════════
-alter publication supabase_realtime add table public.posts;
-alter publication supabase_realtime add table public.post_likes;
-alter publication supabase_realtime add table public.comments;
+do $$ begin
+  alter publication supabase_realtime add table public.posts;
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.post_likes;
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.comments;
+exception when duplicate_object then null; end $$;
 
 -- ═══════════════════════════════════════════════════════════════
 --  Fin. RLS active partout, service_role non requise côté client.

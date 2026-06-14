@@ -1,6 +1,7 @@
 import { DEMO_MODE, supabase } from './supabase'
 import type { Notification } from './types'
 import { uid } from './utils'
+import { setAppBadge } from './badge'
 
 // ─────────────────────────────────────────────────────────────
 // Notifications de valorisation : on flatte l'utilisateur et on l'incite
@@ -44,6 +45,28 @@ export async function fetchNotifications(): Promise<Notification[]> {
   return (data ?? []) as Notification[]
 }
 
+/** Compte les non-lues et met à jour la pastille de l'icône de l'app. */
+export async function syncAppBadge(): Promise<void> {
+  try {
+    const list = await fetchNotifications()
+    setAppBadge(list.filter((n) => !n.read).length)
+  } catch {
+    /* no-op */
+  }
+}
+
+/** Rafraîchit la liste quand une nouvelle notification arrive (temps réel). */
+export function subscribeNotifications(onChange: () => void): () => void {
+  if (DEMO_MODE || !supabase) return () => {}
+  const ch = supabase
+    .channel('notif-' + Math.random().toString(36).slice(2))
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, () => onChange())
+    .subscribe()
+  return () => {
+    supabase!.removeChannel(ch)
+  }
+}
+
 export async function markAllRead(): Promise<void> {
   if (DEMO_MODE) {
     const raw = localStorage.getItem(LS)
@@ -53,6 +76,34 @@ export async function markAllRead(): Promise<void> {
     return
   }
   await supabase!.from('notifications').update({ read: true }).eq('read', false)
+}
+
+/**
+ * Enregistre une notification pour un AUTRE utilisateur (appel manqué,
+ * message, like, commentaire, follow…). Best-effort via le RPC sécurisé.
+ */
+export async function recordNotification(
+  toUser: string | null | undefined,
+  kind: Notification['kind'],
+  title: string,
+  body?: string | null,
+  opts?: { image?: string | null; link?: string | null; actorId?: string | null; actorName?: string | null },
+): Promise<void> {
+  if (DEMO_MODE || !supabase || !toUser) return
+  try {
+    await supabase.rpc('push_notification_rich', {
+      p_user: toUser,
+      p_kind: kind,
+      p_title: title,
+      p_body: body ?? null,
+      p_image: opts?.image ?? null,
+      p_link: opts?.link ?? null,
+      p_actor_id: opts?.actorId ?? null,
+      p_actor_name: opts?.actorName ?? null,
+    })
+  } catch {
+    /* best-effort : ne casse jamais l'action */
+  }
 }
 
 /** Ajoute localement une notif de hype (déclenchée par un événement client). */

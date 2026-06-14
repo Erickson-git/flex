@@ -10,12 +10,12 @@ interface NavItemDef {
 }
 
 const left: NavItemDef[] = [
-  { to: '/app', icon: Home, label: 'Flow', end: true },
-  { to: '/app/squads', icon: Users, label: 'Squads' },
+  { to: '/app', icon: MessageSquare, label: 'Chat', end: true },
+  { to: '/app/flow', icon: Home, label: 'Flow' },
   { to: '/app/arena', icon: Swords, label: 'Arena' },
 ]
 const right: NavItemDef[] = [
-  { to: '/app/directs', icon: MessageSquare, label: 'Directs' },
+  { to: '/app/squads', icon: Users, label: 'Squads' },
   { to: '/app/me', icon: User, label: 'Moi' },
 ]
 

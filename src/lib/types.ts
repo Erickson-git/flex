@@ -13,6 +13,10 @@ export interface Profile {
   username: string
   display_name: string
   avatar_url: string | null
+  /** Image de bannière derrière la photo de profil. */
+  cover_url?: string | null
+  /** Numéro de téléphone (saisi à l'inscription, sert aussi à la recherche). */
+  phone?: string | null
   bio: string | null
   tier: Tier
   /** Numéro d'inscription : #1, #2, ... — moteur du "Pioneer Status". */
@@ -26,6 +30,12 @@ export interface Profile {
   otaku_title?: string | null
   /** Skin visuel de profil (Otaku Sanctuary). */
   profile_theme?: ProfileTheme
+  /** Statut VIP (achat validé par l'admin). Premium = VIP OU essai gratuit 30j. */
+  is_vip?: boolean
+  /** Compte privé : profil verrouillé pour les non-abonnés. */
+  is_private?: boolean
+  /** Compte invité auto : peut explorer, doit choisir un pseudo pour publier/commenter. */
+  is_guest?: boolean
   created_at: string
 }
 
@@ -47,6 +57,12 @@ export interface Flex {
   content: string
   /** URL http(s) d'image, ou "gradient:violet" pour un fond dégradé. */
   media_url: string | null
+  /** Vidéo longue découpée en segments ≤ 1 min, joués à la chaîne dans l'ordre. */
+  media_urls?: string[] | null
+  /** Musique de fond attachée (piste /audio/*.mp3). */
+  sound_url?: string | null
+  /** Empreinte du code PIN si le Flex est verrouillé (FLEX Lite). */
+  pin_hash?: string | null
   likes_count: number
   comments_count: number
   shares_count?: number
@@ -62,9 +78,15 @@ export interface Flex {
 // ── Notifications & modération ──────────────────────────────────
 export interface Notification {
   id: string
-  kind: 'hype' | 'trend' | 'social' | 'system'
+  kind: 'hype' | 'trend' | 'social' | 'system' | 'message' | 'call' | 'like' | 'comment' | 'follow'
   title: string
   body?: string
+  /** Avatar de l'expéditeur (affiché dans le centre de notifications). */
+  image?: string | null
+  /** Route ouverte au clic (ex: la conversation pour un message). */
+  link?: string | null
+  actor_id?: string | null
+  actor_name?: string | null
   read: boolean
   created_at: string
 }
@@ -138,6 +160,8 @@ export interface DirectThread {
   last_message: string
   last_at: string
   unread: number
+  /** Auteur du dernier message (pour le préfixe "Toi :" et les non-lus). */
+  last_sender?: string | null
 }
 
 // ── Économie interne (Sparks) ───────────────────────────────────

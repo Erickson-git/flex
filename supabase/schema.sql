@@ -146,30 +146,48 @@ alter table public.chat_messages enable row level security;
 alter table public.secret_messages enable row level security;
 
 -- Profils : lecture publique, écriture limitée à soi
+drop policy if exists "profiles_read" on public.profiles;
 create policy "profiles_read" on public.profiles for select using (true);
+drop policy if exists "profiles_update_self" on public.profiles;
 create policy "profiles_update_self" on public.profiles for update using (auth.uid() = id);
 
 -- Flexes : lecture publique, création/suppression par l'auteur
+drop policy if exists "flexes_read" on public.flexes;
 create policy "flexes_read" on public.flexes for select using (true);
+drop policy if exists "flexes_insert_self" on public.flexes;
 create policy "flexes_insert_self" on public.flexes for insert with check (auth.uid() = author_id);
+drop policy if exists "flexes_delete_self" on public.flexes;
 create policy "flexes_delete_self" on public.flexes for delete using (auth.uid() = author_id);
 
 -- Likes : lecture publique, gérés par l'utilisateur connecté
+drop policy if exists "likes_read" on public.flex_likes;
 create policy "likes_read" on public.flex_likes for select using (true);
+drop policy if exists "likes_insert_self" on public.flex_likes;
 create policy "likes_insert_self" on public.flex_likes for insert with check (auth.uid() = user_id);
+drop policy if exists "likes_delete_self" on public.flex_likes;
 create policy "likes_delete_self" on public.flex_likes for delete using (auth.uid() = user_id);
 
 -- Messages secrets : visibles uniquement s'ils ne sont pas expirés ;
 -- insertion par l'auteur uniquement. (À durcir selon ta logique de salons.)
+drop policy if exists "secret_read_live" on public.secret_messages;
 create policy "secret_read_live" on public.secret_messages for select using (expires_at > now());
+drop policy if exists "secret_insert_self" on public.secret_messages;
 create policy "secret_insert_self" on public.secret_messages for insert with check (auth.uid() = author_id);
 
 -- Chat : lecture publique (les salons sont ouverts), insertion par l'auteur.
 -- (Pour des Squads privés, ajoute une table d'appartenance + un check ici.)
+drop policy if exists "chat_read" on public.chat_messages;
 create policy "chat_read" on public.chat_messages for select using (true);
+drop policy if exists "chat_insert_self" on public.chat_messages;
 create policy "chat_insert_self" on public.chat_messages for insert with check (auth.uid() = author_id);
 
 -- ── Realtime (fil + salons en direct) ───────────────────────────
-alter publication supabase_realtime add table public.flexes;
-alter publication supabase_realtime add table public.chat_messages;
-alter publication supabase_realtime add table public.secret_messages;
+do $$ begin
+  alter publication supabase_realtime add table public.flexes;
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.chat_messages;
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.secret_messages;
+exception when duplicate_object then null; end $$;

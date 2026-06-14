@@ -15,6 +15,8 @@ export default function DirectThreadPage() {
       title={thread?.peer.display_name ?? 'Direct'}
       subtitle={thread ? `@${thread.peer.username} · en ligne` : undefined}
       accent="from-flex-cyan to-flex-violet"
+      notifyUserId={thread?.peer.id}
+      peer={thread?.peer}
     />
   )
 }

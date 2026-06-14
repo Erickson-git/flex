@@ -19,6 +19,13 @@ dist-ssr/
 secrets*.json
 service-role*.txt
 
+# Clés de signature mobile (NE JAMAIS committer)
+*.keystore
+*.jks
+*.b64
+google-services.json
+GoogleService-Info.plist
+
 # Logs
 *.log
 npm-debug.log*
@@ -35,3 +42,9 @@ Thumbs.db
 # Divers
 coverage/
 .cache/
+
+.vercel
+
+# Artefacts de dev (captures, images en doublon)
+image de bug/
+c08783fe-*.jpg

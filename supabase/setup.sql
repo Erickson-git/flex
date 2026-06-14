@@ -164,33 +164,51 @@ alter table public.chat_messages enable row level security;
 alter table public.secret_messages enable row level security;
 
 -- Profils : lecture publique, écriture limitée à soi
+drop policy if exists "profiles_read" on public.profiles;
 create policy "profiles_read" on public.profiles for select using (true);
+drop policy if exists "profiles_update_self" on public.profiles;
 create policy "profiles_update_self" on public.profiles for update using (auth.uid() = id);
 
 -- Flexes : lecture publique, création/suppression par l'auteur
+drop policy if exists "flexes_read" on public.flexes;
 create policy "flexes_read" on public.flexes for select using (true);
+drop policy if exists "flexes_insert_self" on public.flexes;
 create policy "flexes_insert_self" on public.flexes for insert with check (auth.uid() = author_id);
+drop policy if exists "flexes_delete_self" on public.flexes;
 create policy "flexes_delete_self" on public.flexes for delete using (auth.uid() = author_id);
 
 -- Likes : lecture publique, gérés par l'utilisateur connecté
+drop policy if exists "likes_read" on public.flex_likes;
 create policy "likes_read" on public.flex_likes for select using (true);
+drop policy if exists "likes_insert_self" on public.flex_likes;
 create policy "likes_insert_self" on public.flex_likes for insert with check (auth.uid() = user_id);
+drop policy if exists "likes_delete_self" on public.flex_likes;
 create policy "likes_delete_self" on public.flex_likes for delete using (auth.uid() = user_id);
 
 -- Messages secrets : visibles uniquement s'ils ne sont pas expirés ;
 -- insertion par l'auteur uniquement. (À durcir selon ta logique de salons.)
+drop policy if exists "secret_read_live" on public.secret_messages;
 create policy "secret_read_live" on public.secret_messages for select using (expires_at > now());
+drop policy if exists "secret_insert_self" on public.secret_messages;
 create policy "secret_insert_self" on public.secret_messages for insert with check (auth.uid() = author_id);
 
 -- Chat : lecture publique (les salons sont ouverts), insertion par l'auteur.
 -- (Pour des Squads privés, ajoute une table d'appartenance + un check ici.)
+drop policy if exists "chat_read" on public.chat_messages;
 create policy "chat_read" on public.chat_messages for select using (true);
+drop policy if exists "chat_insert_self" on public.chat_messages;
 create policy "chat_insert_self" on public.chat_messages for insert with check (auth.uid() = author_id);
 
 -- ── Realtime (fil + salons en direct) ───────────────────────────
-alter publication supabase_realtime add table public.flexes;
-alter publication supabase_realtime add table public.chat_messages;
-alter publication supabase_realtime add table public.secret_messages;
+do $$ begin
+  alter publication supabase_realtime add table public.flexes;
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.chat_messages;
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.secret_messages;
+exception when duplicate_object then null; end $$;
 
 -- ╔═══════════════════════════════════════════════════════════╗
 -- ║  SECTION : economy.sql                                    ║
@@ -465,23 +483,34 @@ alter table public.profile_views enable row level security;
 
 -- Wallet : chacun lit le sien. (Aucune policy INSERT/UPDATE/DELETE → mutations
 -- impossibles hors fonctions security definer.)
+drop policy if exists "wallet_read_self" on public.wallets;
 create policy "wallet_read_self" on public.wallets for select using (auth.uid() = user_id);
+drop policy if exists "ledger_read_self" on public.spark_ledger;
 create policy "ledger_read_self" on public.spark_ledger for select using (auth.uid() = user_id);
+drop policy if exists "badges_read_all" on public.user_badges;
 create policy "badges_read_all"  on public.user_badges for select using (true);
 
 -- Marché : annonces visibles de tous ; pas d'écriture directe (via list_badge / buy_listing).
+drop policy if exists "listings_read" on public.market_listings;
 create policy "listings_read" on public.market_listings for select using (true);
 
 -- Spotlights : lisibles de tous (pour pondérer le ranking côté lecture).
+drop policy if exists "spotlight_read" on public.spotlights;
 create policy "spotlight_read" on public.spotlights for select using (true);
 
 -- Visites : seul le profil visité lit ses visiteurs ; insertion par le visiteur.
+drop policy if exists "views_read_target" on public.profile_views;
 create policy "views_read_target" on public.profile_views for select using (auth.uid() = target_id);
+drop policy if exists "views_insert_self" on public.profile_views;
 create policy "views_insert_self" on public.profile_views for insert with check (auth.uid() = viewer_id);
 
 -- Realtime
-alter publication supabase_realtime add table public.wallets;
-alter publication supabase_realtime add table public.market_listings;
+do $$ begin
+  alter publication supabase_realtime add table public.wallets;
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.market_listings;
+exception when duplicate_object then null; end $$;
 
 -- Verrouillage des droits : on retire toute écriture directe résiduelle.
 revoke insert, update, delete on public.wallets from anon, authenticated;
@@ -589,18 +618,26 @@ end;$$;
 alter table public.arena_matches enable row level security;
 alter table public.arena_bets enable row level security;
 
+drop policy if exists "arena_read" on public.arena_matches;
 create policy "arena_read" on public.arena_matches for select using (true);
+drop policy if exists "arena_create" on public.arena_matches;
 create policy "arena_create" on public.arena_matches for insert with check (auth.uid() = player_a);
 -- mise à jour des taps en direct par les deux joueurs
+drop policy if exists "arena_update_players" on public.arena_matches;
 create policy "arena_update_players" on public.arena_matches for update
   using (auth.uid() = player_a or auth.uid() = player_b);
 
+drop policy if exists "bets_read" on public.arena_bets;
 create policy "bets_read" on public.arena_bets for select using (true);
 -- (les insertions de paris passent par place_bet ; pas d'insert direct)
 
 -- Realtime pour le duel + paris en direct
-alter publication supabase_realtime add table public.arena_matches;
-alter publication supabase_realtime add table public.arena_bets;
+do $$ begin
+  alter publication supabase_realtime add table public.arena_matches;
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.arena_bets;
+exception when duplicate_object then null; end $$;
 
 -- ╔═══════════════════════════════════════════════════════════╗
 -- ║  SECTION : growth.sql                                     ║
@@ -714,15 +751,20 @@ alter table public.premium_orders enable row level security;
 alter table public.app_admins enable row level security;
 
 -- L'utilisateur voit/crée ses commandes ; l'admin voit tout.
+drop policy if exists "orders_insert_self" on public.premium_orders;
 create policy "orders_insert_self" on public.premium_orders for insert with check (auth.uid() = user_id);
+drop policy if exists "orders_read_self_or_admin" on public.premium_orders;
 create policy "orders_read_self_or_admin" on public.premium_orders for select
   using (auth.uid() = user_id or public.is_admin());
 -- (mise à jour uniquement via review_order)
 
+drop policy if exists "admins_read" on public.app_admins;
 create policy "admins_read" on public.app_admins for select using (auth.uid() = user_id or public.is_admin());
 
 -- Realtime pour le dashboard admin (nouvelles commandes en direct)
-alter publication supabase_realtime add table public.premium_orders;
+do $$ begin
+  alter publication supabase_realtime add table public.premium_orders;
+exception when duplicate_object then null; end $$;
 
 -- ── Storage : bucket privé "receipts" ───────────────────────────
 -- À créer dans Dashboard → Storage → New bucket "receipts" (privé).
@@ -792,18 +834,27 @@ alter table public.sparks_match enable row level security;
 alter table public.shop_items enable row level security;
 alter table public.events enable row level security;
 
+drop policy if exists "spark_insert_self" on public.sparks_match;
 create policy "spark_insert_self" on public.sparks_match for insert with check (auth.uid() = from_id);
+drop policy if exists "spark_read_involved" on public.sparks_match;
 create policy "spark_read_involved" on public.sparks_match for select
   using (auth.uid() = from_id or auth.uid() = to_id);
 
+drop policy if exists "shop_read" on public.shop_items;
 create policy "shop_read" on public.shop_items for select using (true);
+drop policy if exists "shop_write_self" on public.shop_items;
 create policy "shop_write_self" on public.shop_items for insert with check (auth.uid() = seller_id);
+drop policy if exists "shop_delete_self" on public.shop_items;
 create policy "shop_delete_self" on public.shop_items for delete using (auth.uid() = seller_id);
 
+drop policy if exists "events_read" on public.events;
 create policy "events_read" on public.events for select using (true);
+drop policy if exists "events_create_self" on public.events;
 create policy "events_create_self" on public.events for insert with check (auth.uid() = host_id);
 
-alter publication supabase_realtime add table public.sparks_match;
+do $$ begin
+  alter publication supabase_realtime add table public.sparks_match;
+exception when duplicate_object then null; end $$;
 
 -- ╔═══════════════════════════════════════════════════════════╗
 -- ║  SECTION : otaku.sql                                      ║
@@ -963,14 +1014,22 @@ end;$$;
 alter table public.notifications enable row level security;
 alter table public.reports enable row level security;
 
+drop policy if exists "notif_read_self" on public.notifications;
 create policy "notif_read_self"   on public.notifications for select using (auth.uid() = user_id);
+drop policy if exists "notif_update_self" on public.notifications;
 create policy "notif_update_self" on public.notifications for update using (auth.uid() = user_id);
 
+drop policy if exists "reports_insert_self" on public.reports;
 create policy "reports_insert_self"  on public.reports for insert with check (auth.uid() = reporter_id);
+drop policy if exists "reports_read_admin" on public.reports;
 create policy "reports_read_admin"   on public.reports for select using (public.is_admin() or auth.uid() = reporter_id);
 
-alter publication supabase_realtime add table public.notifications;
-alter publication supabase_realtime add table public.reports;
+do $$ begin
+  alter publication supabase_realtime add table public.notifications;
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.reports;
+exception when duplicate_object then null; end $$;
 
 -- ╔═══════════════════════════════════════════════════════════╗
 -- ║  SECTION : security.sql                                   ║
@@ -1087,9 +1146,11 @@ drop trigger if exists trg_guard_flexes on public.flexes;
 create trigger trg_guard_flexes before insert or update of content on public.flexes
   for each row execute function public.guard_content();
 
-drop trigger if exists trg_guard_comments on public.comments;
+-- 'comments' n'existe pas dans le schéma officiel (schema.sql) ; on protège
+-- DROP *et* CREATE pour ne pas casser le run si la table est absente.
 do $$ begin
   if exists (select 1 from information_schema.tables where table_schema='public' and table_name='comments') then
+    execute 'drop trigger if exists trg_guard_comments on public.comments';
     execute 'create trigger trg_guard_comments before insert or update of content on public.comments for each row execute function public.guard_content()';
   end if;
 end $$;
@@ -1106,7 +1167,9 @@ create trigger trg_guard_secret before insert or update of content on public.sec
 alter table public.security_logs    enable row level security;
 alter table public.blocked_accounts enable row level security;
 
+drop policy if exists "seclog_read_admin" on public.security_logs;
 create policy "seclog_read_admin"   on public.security_logs    for select using (public.is_admin());
+drop policy if exists "blocked_read_admin" on public.blocked_accounts;
 create policy "blocked_read_admin"  on public.blocked_accounts for select using (public.is_admin());
 -- Aucune policy insert/update/delete → mutations IMPOSSIBLES hors fonctions
 -- security definer. security_logs est donc write-once / read-only.

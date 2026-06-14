@@ -267,23 +267,34 @@ alter table public.profile_views enable row level security;
 
 -- Wallet : chacun lit le sien. (Aucune policy INSERT/UPDATE/DELETE → mutations
 -- impossibles hors fonctions security definer.)
+drop policy if exists "wallet_read_self" on public.wallets;
 create policy "wallet_read_self" on public.wallets for select using (auth.uid() = user_id);
+drop policy if exists "ledger_read_self" on public.spark_ledger;
 create policy "ledger_read_self" on public.spark_ledger for select using (auth.uid() = user_id);
+drop policy if exists "badges_read_all" on public.user_badges;
 create policy "badges_read_all"  on public.user_badges for select using (true);
 
 -- Marché : annonces visibles de tous ; pas d'écriture directe (via list_badge / buy_listing).
+drop policy if exists "listings_read" on public.market_listings;
 create policy "listings_read" on public.market_listings for select using (true);
 
 -- Spotlights : lisibles de tous (pour pondérer le ranking côté lecture).
+drop policy if exists "spotlight_read" on public.spotlights;
 create policy "spotlight_read" on public.spotlights for select using (true);
 
 -- Visites : seul le profil visité lit ses visiteurs ; insertion par le visiteur.
+drop policy if exists "views_read_target" on public.profile_views;
 create policy "views_read_target" on public.profile_views for select using (auth.uid() = target_id);
+drop policy if exists "views_insert_self" on public.profile_views;
 create policy "views_insert_self" on public.profile_views for insert with check (auth.uid() = viewer_id);
 
 -- Realtime
-alter publication supabase_realtime add table public.wallets;
-alter publication supabase_realtime add table public.market_listings;
+do $$ begin
+  alter publication supabase_realtime add table public.wallets;
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.market_listings;
+exception when duplicate_object then null; end $$;
 
 -- Verrouillage des droits : on retire toute écriture directe résiduelle.
 revoke insert, update, delete on public.wallets from anon, authenticated;

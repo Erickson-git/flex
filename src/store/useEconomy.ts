@@ -26,7 +26,7 @@ interface EconomyState {
   grantSpotlightRemote: () => Promise<void>
 }
 
-export const useEconomy = create<EconomyState>((set, get) => ({
+export const useEconomy = create<EconomyState>((set) => ({
   wallet: null,
   badges: [],
   loaded: false,

@@ -95,15 +95,23 @@ end;$$;
 alter table public.arena_matches enable row level security;
 alter table public.arena_bets enable row level security;
 
+drop policy if exists "arena_read" on public.arena_matches;
 create policy "arena_read" on public.arena_matches for select using (true);
+drop policy if exists "arena_create" on public.arena_matches;
 create policy "arena_create" on public.arena_matches for insert with check (auth.uid() = player_a);
 -- mise à jour des taps en direct par les deux joueurs
+drop policy if exists "arena_update_players" on public.arena_matches;
 create policy "arena_update_players" on public.arena_matches for update
   using (auth.uid() = player_a or auth.uid() = player_b);
 
+drop policy if exists "bets_read" on public.arena_bets;
 create policy "bets_read" on public.arena_bets for select using (true);
 -- (les insertions de paris passent par place_bet ; pas d'insert direct)
 
 -- Realtime pour le duel + paris en direct
-alter publication supabase_realtime add table public.arena_matches;
-alter publication supabase_realtime add table public.arena_bets;
+do $$ begin
+  alter publication supabase_realtime add table public.arena_matches;
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.arena_bets;
+exception when duplicate_object then null; end $$;

@@ -52,10 +52,37 @@ export function maskedNumber(): string {
 
 const ADMIN_USERNAME = ((import.meta.env.VITE_ADMIN_USERNAME as string) || '').toLowerCase()
 export function isAdmin(me: Profile | null): boolean {
-  if (!me) return false
-  if (ADMIN_USERNAME && me.username === ADMIN_USERNAME) return true
-  // Démo : si aucun admin n'est défini, on autorise l'accès local pour tester.
-  return DEMO_MODE && !ADMIN_USERNAME
+  // Admin = STRICTEMENT le pseudo configuré dans VITE_ADMIN_USERNAME.
+  // Aucun compte simple n'obtient jamais l'admin, dans aucun cas (même en démo).
+  // Le vrai verrou reste la RLS Supabase (app_admins) ; ceci n'est que l'UI.
+  if (!me || !ADMIN_USERNAME) return false
+  return me.username === ADMIN_USERNAME
+}
+
+// ── Essai gratuit Premium (1 mois offert à tout nouveau compte) ──
+export const TRIAL_DAYS = 30
+
+export interface PremiumStatus {
+  /** A accès aux avantages premium (essai OU VIP payant). */
+  active: boolean
+  /** En période d'essai gratuit (pas encore VIP payant). */
+  trial: boolean
+  /** Jours d'essai restants (0 si VIP payant ou essai terminé). */
+  daysLeft: number
+}
+
+/**
+ * Statut premium d'un utilisateur :
+ *  - VIP payant (is_vip) → premium à vie.
+ *  - sinon, premium GRATUIT pendant TRIAL_DAYS jours après l'inscription.
+ */
+export function premiumStatus(me: Profile | null): PremiumStatus {
+  if (!me) return { active: false, trial: false, daysLeft: 0 }
+  const vip = me.is_vip === true
+  const end = new Date(me.created_at).getTime() + TRIAL_DAYS * 86_400_000
+  const daysLeft = Math.max(0, Math.ceil((end - Date.now()) / 86_400_000))
+  const inTrial = daysLeft > 0
+  return { active: vip || inTrial, trial: !vip && inTrial, daysLeft: vip ? 0 : daysLeft }
 }
 
 const LS_ORDERS = 'flex.orders'

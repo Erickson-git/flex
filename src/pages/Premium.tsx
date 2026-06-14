@@ -2,7 +2,7 @@ import { useRef, useState, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { CheckCircle2, ChevronLeft, Copy, Loader2, Upload } from 'lucide-react'
-import { maskedNumber, paymentNumber, PRODUCTS, submitOrder, type Product, type Provider } from '@/lib/premium'
+import { maskedNumber, paymentNumber, premiumStatus, PRODUCTS, submitOrder, type Product, type Provider } from '@/lib/premium'
 import { useAuth } from '@/store/useAuth'
 import { cn, haptic } from '@/lib/utils'
 
@@ -62,6 +62,24 @@ export default function Premium() {
         </button>
         <h1 className="font-display text-xl font-extrabold">Recharger / Premium</h1>
       </header>
+
+      {/* Statut Premium / Essai gratuit */}
+      {(() => {
+        const s = premiumStatus(me)
+        if (!s.active) return null
+        return (
+          <div className="mt-2 rounded-2xl border border-gold/30 bg-gold/[0.06] p-4">
+            <div className="font-display text-lg font-extrabold text-gold-grad">
+              {s.trial ? '🎉 Essai Premium actif' : '👑 Membre VIP'}
+            </div>
+            <p className="mt-1 text-sm text-zinc-300">
+              {s.trial
+                ? `Il te reste ${s.daysLeft} jour${s.daysLeft > 1 ? 's' : ''} de Premium offert — tout est débloqué, sans payer.`
+                : 'Tu profites de tous les avantages Premium.'}
+            </p>
+          </div>
+        )
+      })()}
 
       {/* Produits */}
       <div className="grid grid-cols-2 gap-3 pt-2">

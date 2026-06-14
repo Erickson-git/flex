@@ -1,0 +1,99 @@
+name: Build Android SIGNÉ (Play Store)
+
+# Construit un APK + AAB FLEX SIGNÉS (prêts pour le Google Play Store),
+# gratuitement, sur les serveurs GitHub. Nécessite un keystore mis en Secrets.
+#
+# Secrets GitHub requis (Settings → Secrets and variables → Actions) :
+#   ANDROID_KEYSTORE_BASE64   ← ton keystore encodé en base64
+#   ANDROID_KEYSTORE_PASSWORD ← mot de passe du keystore
+#   ANDROID_KEY_ALIAS         ← alias de la clé (ex. flex)
+#   ANDROID_KEY_PASSWORD      ← mot de passe de la clé
+#   VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY / VITE_ADMIN_USERNAME
+#
+# Créer le keystore (une seule fois, en local) :
+#   keytool -genkey -v -keystore flex.keystore -alias flex -keyalg RSA -keysize 2048 -validity 10000
+#   # puis l'encoder en base64 :
+#   #   Linux/Mac : base64 -w0 flex.keystore > flex.keystore.b64
+#   #   Windows   : certutil -encode flex.keystore flex.keystore.b64
+#   # Copie le contenu dans le secret ANDROID_KEYSTORE_BASE64.
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags: ['release-*']
+
+jobs:
+  build-signed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Construire l'app web
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_DEMO_MODE: 'false'
+          VITE_ADMIN_USERNAME: ${{ secrets.VITE_ADMIN_USERNAME }}
+
+      - name: Générer / synchroniser Android
+        run: |
+          if [ ! -d android ]; then npx cap add android; fi
+          npx cap sync android
+
+      - name: Construire APK + AAB (release, non signés)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease bundleRelease
+
+      - name: Signer l'APK
+        id: sign-apk
+        uses: r0adkll/sign-android-release@v1
+        with:
+          releaseDirectory: android/app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          alias: ${{ secrets.ANDROID_KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        env:
+          BUILD_TOOLS_VERSION: '34.0.0'
+
+      - name: Signer l'AAB (pour le Play Store)
+        id: sign-aab
+        uses: r0adkll/sign-android-release@v1
+        with:
+          releaseDirectory: android/app/build/outputs/bundle/release
+          signingKeyBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          alias: ${{ secrets.ANDROID_KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        env:
+          BUILD_TOOLS_VERSION: '34.0.0'
+
+      - name: Publier l'APK signé (installation directe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: flex-android-apk-signe
+          path: ${{ steps.sign-apk.outputs.signedReleaseFile }}
+
+      - name: Publier l'AAB signé (à envoyer au Play Store)
+        uses: actions/upload-artifact@v4
+        with:
+          name: flex-android-aab-playstore
+          path: ${{ steps.sign-aab.outputs.signedReleaseFile }}

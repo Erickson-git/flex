@@ -56,15 +56,24 @@ alter table public.sparks_match enable row level security;
 alter table public.shop_items enable row level security;
 alter table public.events enable row level security;
 
+drop policy if exists "spark_insert_self" on public.sparks_match;
 create policy "spark_insert_self" on public.sparks_match for insert with check (auth.uid() = from_id);
+drop policy if exists "spark_read_involved" on public.sparks_match;
 create policy "spark_read_involved" on public.sparks_match for select
   using (auth.uid() = from_id or auth.uid() = to_id);
 
+drop policy if exists "shop_read" on public.shop_items;
 create policy "shop_read" on public.shop_items for select using (true);
+drop policy if exists "shop_write_self" on public.shop_items;
 create policy "shop_write_self" on public.shop_items for insert with check (auth.uid() = seller_id);
+drop policy if exists "shop_delete_self" on public.shop_items;
 create policy "shop_delete_self" on public.shop_items for delete using (auth.uid() = seller_id);
 
+drop policy if exists "events_read" on public.events;
 create policy "events_read" on public.events for select using (true);
+drop policy if exists "events_create_self" on public.events;
 create policy "events_create_self" on public.events for insert with check (auth.uid() = host_id);
 
-alter publication supabase_realtime add table public.sparks_match;
+do $$ begin
+  alter publication supabase_realtime add table public.sparks_match;
+exception when duplicate_object then null; end $$;

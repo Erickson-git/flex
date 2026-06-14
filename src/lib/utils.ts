@@ -67,6 +67,14 @@ export function uid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
 }
 
+/**
+ * Identifiant CANONIQUE d'un DM : trié sur les 2 IDs → identique pour les
+ * deux participants (corrige le bug des salons divergents `dm_<peer>`).
+ */
+export function dmRoomId(a: string, b: string): string {
+  return 'dm_' + [a, b].sort().join('_')
+}
+
 // ── Sécurité : nettoyage / validation des entrées utilisateur ────
 
 const INJECTION_RE =

@@ -105,11 +105,19 @@ end;$$;
 alter table public.notifications enable row level security;
 alter table public.reports enable row level security;
 
+drop policy if exists "notif_read_self" on public.notifications;
 create policy "notif_read_self"   on public.notifications for select using (auth.uid() = user_id);
+drop policy if exists "notif_update_self" on public.notifications;
 create policy "notif_update_self" on public.notifications for update using (auth.uid() = user_id);
 
+drop policy if exists "reports_insert_self" on public.reports;
 create policy "reports_insert_self"  on public.reports for insert with check (auth.uid() = reporter_id);
+drop policy if exists "reports_read_admin" on public.reports;
 create policy "reports_read_admin"   on public.reports for select using (public.is_admin() or auth.uid() = reporter_id);
 
-alter publication supabase_realtime add table public.notifications;
-alter publication supabase_realtime add table public.reports;
+do $$ begin
+  alter publication supabase_realtime add table public.notifications;
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.reports;
+exception when duplicate_object then null; end $$;

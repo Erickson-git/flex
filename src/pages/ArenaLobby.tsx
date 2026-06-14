@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Radio, Sparkle, Swords, Zap } from 'lucide-react'
+import { Gamepad2, Radio, Sparkle, Swords, Trophy, Zap } from 'lucide-react'
 import { createQuickMatch, featuredMatches } from '@/lib/arena'
 import { useAuth } from '@/store/useAuth'
 import { useEconomy } from '@/store/useEconomy'
@@ -55,6 +55,69 @@ export default function ArenaLobby() {
           <div className="relative">
             <div className="font-display text-2xl font-extrabold text-white">DUEL EXPRESS</div>
             <div className="text-sm font-medium text-white/80">Tape plus vite. Rafle les Sparks.</div>
+          </div>
+        </motion.button>
+      </div>
+
+      {/* Cercle des Défis */}
+      <div className="px-4 pt-3">
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => {
+            haptic(12)
+            navigate('/app/challenges')
+          }}
+          className="flex w-full items-center gap-4 rounded-3xl border border-gold/30 bg-gold/5 p-4 text-left"
+        >
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gold/15 text-gold">
+            <Trophy className="h-6 w-6" />
+          </div>
+          <div className="flex-1">
+            <div className="font-display text-lg font-extrabold text-white">Cercle des Défis</div>
+            <div className="text-sm text-zinc-400">Gagne un défi → débloque des fonctionnalités payantes</div>
+          </div>
+        </motion.button>
+      </div>
+
+      {/* En direct (salon live Realtime) */}
+      <div className="px-4 pt-3">
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => {
+            haptic(12)
+            navigate('/app/live')
+          }}
+          className="flex w-full items-center gap-4 rounded-3xl border border-flex-pink/30 bg-flex-pink/5 p-4 text-left"
+        >
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-flex-pink/15 text-flex-pink">
+            <Radio className="h-6 w-6" />
+          </div>
+          <div className="flex-1">
+            <div className="font-display text-lg font-extrabold text-white">Salon Live</div>
+            <div className="text-sm text-zinc-400">Chat en direct · cadeaux · spectateurs</div>
+          </div>
+          <span className="flex items-center gap-1.5 rounded-full bg-flex-pink/15 px-2.5 py-1 text-[10px] font-bold uppercase text-flex-pink">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-flex-pink" /> Live
+          </span>
+        </motion.button>
+      </div>
+
+      {/* Mini-jeux */}
+      <div className="px-4 pt-3">
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => {
+            haptic(12)
+            navigate('/app/games')
+          }}
+          className="flex w-full items-center gap-4 rounded-3xl border border-flex-cyan/30 bg-flex-cyan/5 p-4 text-left"
+        >
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-flex-cyan/15 text-flex-cyan">
+            <Gamepad2 className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="font-display text-lg font-extrabold text-white">Mini-jeux</div>
+            <div className="text-sm text-zinc-400">Spark Tap · grimpe au classement mondial</div>
           </div>
         </motion.button>
       </div>

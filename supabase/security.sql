@@ -109,9 +109,11 @@ drop trigger if exists trg_guard_flexes on public.flexes;
 create trigger trg_guard_flexes before insert or update of content on public.flexes
   for each row execute function public.guard_content();
 
-drop trigger if exists trg_guard_comments on public.comments;
+-- 'comments' n'existe pas dans le schéma officiel (schema.sql) ; on protège
+-- DROP *et* CREATE pour ne pas casser le run si la table est absente.
 do $$ begin
   if exists (select 1 from information_schema.tables where table_schema='public' and table_name='comments') then
+    execute 'drop trigger if exists trg_guard_comments on public.comments';
     execute 'create trigger trg_guard_comments before insert or update of content on public.comments for each row execute function public.guard_content()';
   end if;
 end $$;
@@ -128,7 +130,9 @@ create trigger trg_guard_secret before insert or update of content on public.sec
 alter table public.security_logs    enable row level security;
 alter table public.blocked_accounts enable row level security;
 
+drop policy if exists "seclog_read_admin" on public.security_logs;
 create policy "seclog_read_admin"   on public.security_logs    for select using (public.is_admin());
+drop policy if exists "blocked_read_admin" on public.blocked_accounts;
 create policy "blocked_read_admin"  on public.blocked_accounts for select using (public.is_admin());
 -- Aucune policy insert/update/delete → mutations IMPOSSIBLES hors fonctions
 -- security definer. security_logs est donc write-once / read-only.

@@ -106,15 +106,20 @@ alter table public.premium_orders enable row level security;
 alter table public.app_admins enable row level security;
 
 -- L'utilisateur voit/crée ses commandes ; l'admin voit tout.
+drop policy if exists "orders_insert_self" on public.premium_orders;
 create policy "orders_insert_self" on public.premium_orders for insert with check (auth.uid() = user_id);
+drop policy if exists "orders_read_self_or_admin" on public.premium_orders;
 create policy "orders_read_self_or_admin" on public.premium_orders for select
   using (auth.uid() = user_id or public.is_admin());
 -- (mise à jour uniquement via review_order)
 
+drop policy if exists "admins_read" on public.app_admins;
 create policy "admins_read" on public.app_admins for select using (auth.uid() = user_id or public.is_admin());
 
 -- Realtime pour le dashboard admin (nouvelles commandes en direct)
-alter publication supabase_realtime add table public.premium_orders;
+do $$ begin
+  alter publication supabase_realtime add table public.premium_orders;
+exception when duplicate_object then null; end $$;
 
 -- ── Storage : bucket privé "receipts" ───────────────────────────
 -- À créer dans Dashboard → Storage → New bucket "receipts" (privé).

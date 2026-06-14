@@ -123,6 +123,63 @@ export async function claimUsername(username: string, displayName?: string): Pro
   return data as Profile
 }
 
+/**
+ * Compte INVITÉ : connexion anonyme + profil provisoire (pseudo "invite-…").
+ * Permet d'explorer sans inscription. Idempotent (renvoie le profil existant).
+ */
+export async function ensureGuest(): Promise<Profile> {
+  if (DEMO_MODE) {
+    const existing = read<Profile | null>(LS.session, null)
+    if (existing) return existing
+    const me: Profile = {
+      id: uid(),
+      username: 'invite-' + uid().slice(0, 6),
+      display_name: 'Invité',
+      avatar_url: dicebear('invite'),
+      bio: null,
+      tier: 'member',
+      joined_rank: 0,
+      followers_count: 0,
+      following_count: 0,
+      flex_score: 0,
+      is_guest: true,
+      created_at: new Date().toISOString(),
+    }
+    write(LS.session, me)
+    return me
+  }
+  const { data: userData } = await supabase!.auth.getUser()
+  if (!userData.user) {
+    const { error } = await supabase!.auth.signInAnonymously()
+    if (error) throw error
+  }
+  const { data, error } = await supabase!.rpc('claim_guest')
+  if (error) throw error
+  return data as Profile
+}
+
+/**
+ * Finalise un compte invité : pseudo OBLIGATOIRE (unique), nom d'affichage
+ * optionnel. Débloque la publication et les commentaires.
+ */
+export async function finalizeUsername(username: string, displayName?: string): Promise<Profile> {
+  const u = username.trim().toLowerCase()
+  if (DEMO_MODE) {
+    const me = read<Profile | null>(LS.session, null)
+    if (!me) throw new Error('Session absente.')
+    const updated: Profile = { ...me, username: u, display_name: displayName?.trim() || u, is_guest: false }
+    write(LS.session, updated)
+    write(LS.profiles, demoProfiles().map((p) => (p.id === me.id ? updated : p)))
+    return updated
+  }
+  const { data, error } = await supabase!.rpc('finalize_username', {
+    p_username: u,
+    p_display_name: displayName?.trim() || null,
+  })
+  if (error) throw error
+  return data as Profile
+}
+
 /** Met à jour des champs du profil courant (titre otaku, thème, musique…). */
 export async function updateMyProfile(me: Profile, patch: Partial<Profile>): Promise<Profile> {
   const updated: Profile = { ...me, ...patch }
@@ -161,23 +218,58 @@ function flowScore(f: Flex): number {
   return f.likes_count * 0.5 + f.comments_count * 1.2 + recency * 3
 }
 
-export async function fetchFlow(): Promise<Flex[]> {
+/**
+ * Fil public PAGINÉ : on charge une page à la fois (offset/limit) pour que
+ * l'utilisateur puisse voir TOUTES les publications en faisant défiler, sans
+ * jamais en cacher. Les publications n'expirent pas (aucun filtre de date).
+ */
+export async function fetchFlow(offset = 0, limit = 60): Promise<Flex[]> {
   if (DEMO_MODE) {
     const likes = read<Record<string, boolean>>(LS.likes, {})
     return [...demoFlexes()]
       .map((f) => ({ ...f, liked_by_me: !!likes[f.id] }))
       .sort((a, b) => flowScore(b) - flowScore(a))
+      .slice(offset, offset + limit)
   }
   const { data, error } = await supabase!
     .from('flexes')
-    .select('*, author:profiles(*)')
+    .select('*, author:profiles!author_id(*)')
     .order('created_at', { ascending: false })
-    .limit(80)
+    .range(offset, offset + limit - 1)
   if (error) throw error
-  return ((data ?? []) as Flex[]).sort((a, b) => flowScore(b) - flowScore(a))
+  const flexes = (data ?? []) as Flex[]
+  // Marque les Flex déjà likés par l'utilisateur (sinon re-like → doublon PK).
+  try {
+    const { data: auth } = await supabase!.auth.getUser()
+    if (auth.user) {
+      const { data: likes } = await supabase!.from('flex_likes').select('flex_id').eq('user_id', auth.user.id)
+      const liked = new Set((likes ?? []).map((l: { flex_id: string }) => l.flex_id))
+      flexes.forEach((f) => { f.liked_by_me = liked.has(f.id) })
+    }
+  } catch { /* lecture des likes best-effort */ }
+  return flexes.sort((a, b) => flowScore(b) - flowScore(a))
 }
 
-export async function createFlex(content: string, mediaUrl: string | null, me: Profile): Promise<Flex> {
+/** Temps réel : tout nouveau Flex publié déclenche `onChange` (feed live pour tous). */
+export function subscribeFlexes(onChange: () => void): () => void {
+  if (DEMO_MODE || !supabase) return () => {}
+  const channel = supabase
+    .channel('feed:flexes')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'flexes' }, () => onChange())
+    .subscribe()
+  return () => {
+    supabase!.removeChannel(channel)
+  }
+}
+
+export async function createFlex(
+  content: string,
+  mediaUrl: string | null,
+  me: Profile,
+  pinHash: string | null = null,
+  soundUrl: string | null = null,
+  mediaUrls: string[] | null = null,
+): Promise<Flex> {
   if (DEMO_MODE) {
     // Starification : le post du nouvel inscrit démarre déjà "chaud".
     const seedLikes = 40 + Math.floor(Date.now() % 120)
@@ -187,6 +279,9 @@ export async function createFlex(content: string, mediaUrl: string | null, me: P
       author: me,
       content,
       media_url: mediaUrl,
+      media_urls: mediaUrls,
+      sound_url: soundUrl,
+      pin_hash: pinHash,
       likes_count: seedLikes,
       comments_count: Math.floor(seedLikes / 6),
       created_at: new Date().toISOString(),
@@ -196,13 +291,61 @@ export async function createFlex(content: string, mediaUrl: string | null, me: P
     write(LS.flexes, [flex, ...demoFlexes()])
     return flex
   }
+  const row: Record<string, unknown> = { author_id: me.id, content, media_url: mediaUrl }
+  if (pinHash) row.pin_hash = pinHash // n'envoie la colonne que si verrouillé (robuste)
+  if (soundUrl) row.sound_url = soundUrl
+  if (mediaUrls && mediaUrls.length > 1) row.media_urls = mediaUrls // vidéo découpée
   const { data, error } = await supabase!
     .from('flexes')
-    .insert({ author_id: me.id, content, media_url: mediaUrl })
-    .select('*, author:profiles(*)')
+    .insert(row)
+    .select('*, author:profiles!author_id(*)')
     .single()
   if (error) throw error
   return data as Flex
+}
+
+/** Historique des Flex d'un profil (le plus récent d'abord). */
+export async function fetchUserFlexes(userId: string): Promise<Flex[]> {
+  if (DEMO_MODE) {
+    return demoFlexes().filter((f) => f.author_id === userId)
+  }
+  const { data, error } = await supabase!
+    .from('flexes')
+    .select('*, author:profiles!author_id(*)')
+    .eq('author_id', userId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as Flex[]
+}
+
+/** Modifie le texte d'un Flex existant (auteur uniquement, RLS). */
+export async function updateFlexContent(flexId: string, content: string): Promise<void> {
+  if (DEMO_MODE) {
+    write(LS.flexes, demoFlexes().map((f) => (f.id === flexId ? { ...f, content } : f)))
+    return
+  }
+  const { error } = await supabase!.from('flexes').update({ content }).eq('id', flexId)
+  if (error) throw error
+}
+
+/** Supprime un Flex (auteur uniquement, RLS). */
+export async function deleteFlex(flexId: string): Promise<void> {
+  if (DEMO_MODE) {
+    write(LS.flexes, demoFlexes().filter((f) => f.id !== flexId))
+    return
+  }
+  const { error } = await supabase!.from('flexes').delete().eq('id', flexId)
+  if (error) throw error
+}
+
+/** Verrouille (hash PIN) ou déverrouille (null) un Flex existant. */
+export async function setFlexPin(flexId: string, pinHash: string | null): Promise<void> {
+  if (DEMO_MODE) {
+    write(LS.flexes, demoFlexes().map((f) => (f.id === flexId ? { ...f, pin_hash: pinHash } : f)))
+    return
+  }
+  const { error } = await supabase!.from('flexes').update({ pin_hash: pinHash }).eq('id', flexId)
+  if (error) throw error
 }
 
 /** Like / "Flex" optimiste. Renvoie le nouvel état liké. */
@@ -377,8 +520,68 @@ export function subscribeRoom(roomId: string, onChange: () => void): () => void 
 
 export async function fetchThreads(): Promise<DirectThread[]> {
   if (DEMO_MODE) return DEMO_THREADS
-  // En prod, à dériver des conversations chat_messages (dm_*).
-  return DEMO_THREADS
+  const { data } = await supabase!.rpc('list_dm_threads')
+  type Row = {
+    room_id: string
+    peer_id: string
+    peer_name: string | null
+    peer_avatar: string | null
+    peer_username: string | null
+    last_message: string | null
+    last_at: string
+    last_sender: string | null
+  }
+  return ((data ?? []) as Row[]).map((t) => ({
+    id: t.room_id,
+    peer: {
+      id: t.peer_id,
+      username: t.peer_username ?? '',
+      display_name: t.peer_name ?? t.peer_username ?? '',
+      avatar_url: t.peer_avatar,
+    } as unknown as Profile,
+    last_message: t.last_message ?? '',
+    last_at: t.last_at,
+    unread: 0,
+    last_sender: t.last_sender,
+  }))
+}
+
+/** Abonnement temps réel à la liste des conversations (mise à jour live). */
+export function subscribeThreads(onChange: () => void): () => void {
+  if (DEMO_MODE || !supabase) return () => {}
+  const ch = supabase
+    .channel('threads-' + Math.random().toString(36).slice(2))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'dm_threads' }, () => onChange())
+    .subscribe()
+  return () => {
+    supabase!.removeChannel(ch)
+  }
+}
+
+/** Met à jour le résumé de conversation (dernier message) pour la liste Chat. */
+export async function touchDmThread(roomId: string, peerId: string, text: string): Promise<void> {
+  if (DEMO_MODE || !supabase) return
+  try {
+    await supabase.rpc('touch_dm_thread', { p_room: roomId, p_peer: peerId, p_text: text })
+  } catch {
+    /* best-effort */
+  }
+}
+
+/** Réagit à un message (toggle un emoji). */
+export async function reactMessage(messageId: string, emoji: string): Promise<void> {
+  if (DEMO_MODE || !supabase) return
+  try {
+    await supabase.rpc('react_message', { p_id: messageId, p_emoji: emoji })
+  } catch {
+    /* best-effort */
+  }
+}
+
+/** Supprime son propre message. */
+export async function deleteMessage(messageId: string): Promise<void> {
+  if (DEMO_MODE || !supabase) return
+  await supabase.rpc('delete_message', { p_id: messageId })
 }
 
 const hideoutKey = (id: string) => `flex.hideout.${id}`

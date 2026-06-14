@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { Profile } from '@/lib/types'
-import { getCurrentProfile, signOut as apiSignOut } from '@/lib/api'
+import { ensureGuest as apiEnsureGuest, getCurrentProfile, signOut as apiSignOut } from '@/lib/api'
 
 interface AuthState {
   me: Profile | null
@@ -8,6 +8,8 @@ interface AuthState {
   /** Charge le profil courant au démarrage. */
   bootstrap: () => Promise<void>
   setMe: (p: Profile) => void
+  /** Crée/charge un compte invité et entre dans l'app. */
+  enterAsGuest: () => Promise<Profile>
   signOut: () => Promise<void>
 }
 
@@ -24,6 +26,11 @@ export const useAuth = create<AuthState>((set) => ({
     }
   },
   setMe: (p) => set({ me: p }),
+  enterAsGuest: async () => {
+    const me = await apiEnsureGuest()
+    set({ me, loading: false })
+    return me
+  },
   signOut: async () => {
     clearGhostTraces()
     await apiSignOut()

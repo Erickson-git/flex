@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Loader2 } from 'lucide-react'
-import { fetchFlow } from '@/lib/api'
+import { Loader2, Search as SearchIcon } from 'lucide-react'
+import { fetchFlow, subscribeFlexes } from '@/lib/api'
 import type { Flex } from '@/lib/types'
 import { useAuth } from '@/store/useAuth'
 import { useTripleTap } from '@/hooks/useTripleTap'
@@ -16,17 +16,45 @@ import { SparksChip } from '@/components/SparksChip'
 import { NotificationCenter } from '@/components/NotificationCenter'
 import { Avatar } from '@/components/Avatar'
 import { PrestigeBadge } from '@/components/PrestigeBadge'
-import { sortForYou, sortTrending } from '@/lib/feedAlgorithm'
+import { sortTrending } from '@/lib/feedAlgorithm'
+import { personalizeFeed } from '@/lib/engagement'
 import { cn, haptic, prestigeFromScore, prestigeProgress } from '@/lib/utils'
+
+const PAGE = 60
+
+/** Fusionne deux listes de Flex sans doublon (par id), en gardant les plus récents. */
+function mergeFlexes(a: Flex[], b: Flex[]): Flex[] {
+  const map = new Map<string, Flex>()
+  for (const f of a) map.set(f.id, f)
+  for (const f of b) map.set(f.id, f)
+  return [...map.values()]
+}
 
 export default function FlexFlow() {
   const me = useAuth((s) => s.me)
   const navigate = useNavigate()
   const [flexes, setFlexes] = useState<Flex[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
   const [tab, setTab] = useState<'foryou' | 'trends'>('foryou')
 
-  const displayed = tab === 'trends' ? sortTrending(flexes) : sortForYou(flexes)
+  const displayed = tab === 'trends' ? sortTrending(flexes) : personalizeFeed(flexes)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  async function loadMore() {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const page = await fetchFlow(flexes.length, PAGE)
+      setFlexes((prev) => mergeFlexes(prev, page))
+      if (page.length < PAGE) setHasMore(false)
+    } catch {
+      /* ignore */
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   // Ghost Mode : triple-tap sur le logo → ouvre The Hideouts (geste secret).
   const onLogoTap = useTripleTap(() => {
@@ -35,10 +63,40 @@ export default function FlexFlow() {
   })
 
   useEffect(() => {
-    fetchFlow()
-      .then(setFlexes)
-      .finally(() => setLoading(false))
+    let active = true
+    // Première page + fusion des nouveautés temps réel (sans écraser les pages
+    // déjà chargées en "voir plus").
+    const load = () =>
+      fetchFlow(0, PAGE)
+        .then((f) => {
+          if (!active) return
+          setFlexes((prev) => (prev.length ? mergeFlexes(prev, f) : f))
+          if (f.length < PAGE) setHasMore(false)
+        })
+        .catch(() => {})
+    load().finally(() => active && setLoading(false))
+    // Feed temps réel : un nouveau Flex publié par n'importe qui apparaît live.
+    const unsub = subscribeFlexes(load)
+    return () => {
+      active = false
+      unsub()
+    }
   }, [])
+
+  // Défilement infini : charge la page suivante quand on approche du bas.
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !hasMore || loading) return
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loadingMore) loadMore()
+      },
+      { rootMargin: '700px' },
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMore, loadingMore, loading, flexes.length])
 
   const prog = me ? prestigeProgress(me.flex_score) : 0
   const meta = me ? prestigeFromScore(me.flex_score) : null
@@ -54,6 +112,9 @@ export default function FlexFlow() {
           </h1>
           {me && (
             <div className="flex items-center gap-1.5">
+              <button onClick={() => navigate('/app/search')} aria-label="Rechercher" className="grid h-9 w-9 place-items-center rounded-full text-zinc-300">
+                <SearchIcon className="h-5 w-5" />
+              </button>
               <SparksChip onClick={() => navigate('/app/market')} />
               <NotificationCenter />
               <button onClick={() => navigate('/app/me')}>
@@ -117,6 +178,18 @@ export default function FlexFlow() {
           {displayed.map((f, i) => (
             <FlexCard key={f.id} flex={f} index={i} />
           ))}
+          {displayed.length === 0 && (
+            <p className="py-16 text-center text-sm text-zinc-600">Aucune publication pour l'instant.</p>
+          )}
+          {hasMore && displayed.length > 0 && (
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="mx-auto mt-2 flex items-center justify-center gap-2 rounded-full border border-white/10 px-6 py-2.5 text-sm font-bold text-zinc-300 active:scale-95 disabled:opacity-50"
+            >
+              {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Voir plus de publications'}
+            </button>
+          )}
         </div>
       )}
     </div>

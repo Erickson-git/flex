@@ -11,6 +11,8 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // 'autoUpdate' : la nouvelle version s'applique automatiquement au prochain
+      // chargement (fini les versions périmées coincées en cache).
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'logo.jpg', 'icons/*.jpg'],
       manifest: {
@@ -34,6 +36,10 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,jpg,ico,woff2}'],
         navigateFallback: '/index.html',
+        // Ne pas remplacer ces vraies pages/fichiers par l'app (SPA fallback).
+        navigateFallbackDenylist: [/^\/legal\//, /^\/\.well-known\//],
+        // Handlers de notifications push (importés dans le SW généré).
+        importScripts: ['push-handler.js'],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/storage/'),

@@ -33,7 +33,7 @@ export default function Welcome() {
     : `Bienvenue, Fondateur #${me.joined_rank}.`
 
   return (
-    <div className="grain relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 text-center">
+    <div className="grain relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden px-6 text-center">
       {/* rayons dorés */}
       <div className="pointer-events-none absolute inset-0 bg-[conic-gradient(from_180deg_at_50%_40%,rgba(232,201,122,0.12),transparent_25%,rgba(255,77,141,0.1),transparent_60%,rgba(232,201,122,0.12))]" />
 

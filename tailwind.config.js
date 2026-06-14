@@ -12,11 +12,12 @@ export default {
           600: '#18181b',
           500: '#27272a',
         },
-        // Calibré sur la lueur néon de l'éclair du logo officiel
+        // Accent THÉMABLE : piloté par --accent (cf. src/lib/themes.ts).
+        // Un seul changement de variable re-colore toute l'app.
         gold: {
-          DEFAULT: '#f7b733',
-          soft: '#ffe0a3',
-          deep: '#ff7a18',
+          DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
+          soft: 'rgb(var(--accent-soft) / <alpha-value>)',
+          deep: 'rgb(var(--accent-deep) / <alpha-value>)',
         },
         flex: {
           // accent néon pour les micro-récompenses
@@ -30,13 +31,14 @@ export default {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        // halo néon doré-orangé (lueur de l'éclair)
-        glow: '0 0 44px -6px rgba(247,183,51,0.55)',
-        'glow-pink': '0 0 36px -6px rgba(255,77,141,0.55)',
-        card: '0 10px 40px -12px rgba(0,0,0,0.85)',
+        // halo discret, couleur du thème (var --accent)
+        glow: '0 0 26px -12px rgb(var(--accent) / 0.32)',
+        'glow-pink': '0 0 24px -12px rgba(255,77,141,0.30)',
+        card: '0 10px 40px -14px rgba(0,0,0,0.8)',
       },
       backgroundImage: {
-        'gold-grad': 'linear-gradient(135deg,#ffe0a3 0%,#f7b733 45%,#ff7a18 100%)',
+        // CTA : dégradé d'accent thémable (var --accent)
+        'gold-grad': 'linear-gradient(135deg, rgb(var(--accent-soft)) 0%, rgb(var(--accent)) 50%, rgb(var(--accent-deep)) 100%)',
         'noir-grad': 'radial-gradient(120% 120% at 50% 0%,#141210 0%,#0a0807 55%,#050505 100%)',
       },
       keyframes: {
