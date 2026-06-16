@@ -169,6 +169,7 @@ export default function Profile() {
         {/* ── Menu organisé par sections ──────────────────────── */}
         <MenuSection title="Mon univers" />
         <MenuCard>
+          <MenuRow icon={Share2} accent="gold" label="Partager FLEX" sub="Invite tes amis — chacun crée son propre compte" onClick={share} />
           <MenuRow icon={Lock} accent="gold" label="Galerie privée" sub="Photos, vidéos & appels protégés" onClick={() => navigate('/app/gallery')} />
           <MenuRow icon={Sparkles} accent="violet" label="Otaku Sanctuary" sub="Titres & skins" onClick={() => navigate('/app/otaku')} />
           <MenuRow icon={Music2} accent="gold" label="Sons FLEX" sub="Musiques & sonnerie" onClick={() => navigate('/app/sounds')} />
