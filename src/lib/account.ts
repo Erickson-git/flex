@@ -63,3 +63,19 @@ export async function hasActiveSession(): Promise<boolean> {
   const { data } = await supabase.auth.getSession()
   return !!data.session
 }
+
+/**
+ * Le compte courant est-il ANONYME (= sans aucun identifiant : pas de mot de
+ * passe) ? Vrai uniquement pour les anciens comptes jamais sécurisés.
+ * Un compte avec mot de passe (email/synthétique ou téléphone) renvoie false
+ * → on ne lui redemande JAMAIS de créer un mot de passe.
+ */
+export async function isAnonymousAccount(): Promise<boolean> {
+  if (!supabase) return false
+  const { data } = await supabase.auth.getUser()
+  const u = data.user as (NonNullable<typeof data.user> & { is_anonymous?: boolean }) | null
+  if (!u) return false
+  if (u.is_anonymous === true) return true
+  // Repli : aucun email ET aucun téléphone rattachés = pas de mot de passe.
+  return !u.email && !u.phone
+}

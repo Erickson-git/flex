@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Eye, EyeOff, Loader2, Lock, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/store/useAuth'
-import { currentEmail, secureAccount } from '@/lib/account'
+import { isAnonymousAccount, secureAccount } from '@/lib/account'
 import { checkPassword, STRENGTH_COLORS } from '@/lib/password'
 import { BrandLogo } from './BrandLogo'
 import { haptic } from '@/lib/utils'
@@ -27,9 +27,10 @@ export function PasswordGate() {
       setNeeds(false)
       return
     }
-    // Pas d'email rattaché = compte anonyme sans mot de passe → on l'exige.
-    currentEmail()
-      .then((e) => active && setNeeds(!e))
+    // On n'exige un mot de passe QUE pour les comptes anonymes (sans mot de
+    // passe). Tout compte déjà sécurisé (avec mot de passe) → jamais sollicité.
+    isAnonymousAccount()
+      .then((anon) => active && setNeeds(anon))
       .catch(() => active && setNeeds(false))
     return () => {
       active = false
