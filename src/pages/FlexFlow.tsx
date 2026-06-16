@@ -5,7 +5,7 @@ import { Loader2, Search as SearchIcon } from 'lucide-react'
 import { fetchFlow, subscribeFlexes } from '@/lib/api'
 import type { Flex } from '@/lib/types'
 import { useAuth } from '@/store/useAuth'
-import { useTripleTap } from '@/hooks/useTripleTap'
+import { BrandSheet } from '@/components/BrandSheet'
 import { FlexCard } from '@/components/FlexCard'
 import { LiveTicker } from '@/components/LiveTicker'
 import { StoriesBar } from '@/components/StoriesBar'
@@ -38,6 +38,7 @@ export default function FlexFlow() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [tab, setTab] = useState<'foryou' | 'trends'>('foryou')
+  const [appSheet, setAppSheet] = useState(false)
 
   const displayed = tab === 'trends' ? sortTrending(flexes) : personalizeFeed(flexes)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -56,11 +57,25 @@ export default function FlexFlow() {
     }
   }
 
-  // Ghost Mode : triple-tap sur le logo → ouvre The Hideouts (geste secret).
-  const onLogoTap = useTripleTap(() => {
-    haptic([20, 40, 20])
-    navigate('/ghost')
-  })
+  // Nom « FLEX » : tap = fenêtre app/partage ; appui long (800 ms) = Ghost Mode (secret).
+  const pressTimer = useRef<number | null>(null)
+  const longPressed = useRef(false)
+  const startPress = () => {
+    longPressed.current = false
+    pressTimer.current = window.setTimeout(() => {
+      longPressed.current = true
+      haptic([20, 40, 20])
+      navigate('/ghost')
+    }, 800)
+  }
+  const endPress = () => {
+    if (pressTimer.current) clearTimeout(pressTimer.current)
+  }
+  const onLogoClick = () => {
+    if (longPressed.current) return // appui long → ne pas ouvrir la fenêtre
+    haptic(8)
+    setAppSheet(true)
+  }
 
   useEffect(() => {
     let active = true
@@ -107,7 +122,15 @@ export default function FlexFlow() {
 
       <header className="safe-top sticky top-0 z-30 bg-ink-900/80 backdrop-blur-xl">
         <div className="flex items-center justify-between px-5 pb-2 pt-2">
-          <h1 onClick={onLogoTap} className="cursor-pointer select-none font-display text-3xl font-extrabold tracking-tight">
+          <h1
+            onClick={onLogoClick}
+            onMouseDown={startPress}
+            onMouseUp={endPress}
+            onMouseLeave={endPress}
+            onTouchStart={startPress}
+            onTouchEnd={endPress}
+            className="cursor-pointer select-none font-display text-3xl font-extrabold tracking-tight"
+          >
             <span className="text-gold-grad">FLEX</span>
           </h1>
           {me && (
@@ -192,6 +215,8 @@ export default function FlexFlow() {
           )}
         </div>
       )}
+
+      <BrandSheet open={appSheet} onClose={() => setAppSheet(false)} />
     </div>
   )
 }
