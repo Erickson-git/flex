@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ChevronLeft, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { ChevronLeft, Eye, EyeOff, Loader2, ScanFace } from 'lucide-react'
 import { signInWithEmail } from '@/lib/account'
+import { biometricEnabled, biometricSupported, getFaceAccount, verifyBiometric } from '@/lib/biometric'
 import { useAuth } from '@/store/useAuth'
 import { BrandLogo } from '@/components/BrandLogo'
 import { haptic } from '@/lib/utils'
@@ -16,8 +17,42 @@ export default function SignIn() {
   const [showPwd, setShowPwd] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [faceOk, setFaceOk] = useState(false)
+  const [faceBusy, setFaceBusy] = useState(false)
 
   const canSubmit = ident.trim().length > 0 && pwd.length > 0 && !busy
+
+  // La « connexion au visage » est-elle dispo sur cet appareil ?
+  useEffect(() => {
+    const uid = getFaceAccount()
+    if (uid && biometricEnabled(uid)) biometricSupported().then((s) => setFaceOk(s))
+  }, [])
+
+  async function faceLogin() {
+    const uid = getFaceAccount()
+    if (!uid || faceBusy) return
+    setFaceBusy(true)
+    setErr(null)
+    try {
+      const ok = await verifyBiometric(uid)
+      if (!ok) {
+        setErr('Visage non reconnu — utilise ton mot de passe.')
+        return
+      }
+      haptic([10, 30, 10])
+      // Le visage est reconnu : on restaure la session de cet appareil.
+      await bootstrap()
+      if (useAuth.getState().me) {
+        navigate('/app', { replace: true })
+      } else {
+        setErr('Session expirée — connecte-toi une fois avec ton mot de passe.')
+      }
+    } catch {
+      setErr('Échec du scan — utilise ton mot de passe.')
+    } finally {
+      setFaceBusy(false)
+    }
+  }
 
   async function submit() {
     if (!canSubmit) return
@@ -54,6 +89,21 @@ export default function SignIn() {
           transition={{ delay: 0.4, duration: 0.6 }}
           className="mt-10 w-full max-w-xs space-y-3"
         >
+          {faceOk && (
+            <>
+              <button
+                onClick={faceLogin}
+                disabled={faceBusy}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-gold/40 bg-gold/10 py-3.5 text-base font-bold text-gold transition active:scale-[0.98] disabled:opacity-50"
+              >
+                {faceBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <ScanFace className="h-5 w-5" />}
+                Se connecter avec le visage
+              </button>
+              <div className="flex items-center gap-3 py-1 text-[11px] uppercase tracking-widest text-zinc-600">
+                <span className="h-px flex-1 bg-white/10" /> ou <span className="h-px flex-1 bg-white/10" />
+              </div>
+            </>
+          )}
           <input
             value={ident}
             onChange={(e) => setIdent(e.target.value)}

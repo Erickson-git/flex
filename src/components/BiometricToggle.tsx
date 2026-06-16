@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, ScanFace } from 'lucide-react'
 import { useAuth } from '@/store/useAuth'
-import { biometricEnabled, biometricSupported, disableBiometric, registerBiometric } from '@/lib/biometric'
+import { biometricEnabled, biometricSupported, clearFaceAccount, disableBiometric, registerBiometric, setFaceAccount } from '@/lib/biometric'
 import { haptic } from '@/lib/utils'
 
 /**
@@ -31,11 +31,13 @@ export function BiometricToggle() {
     try {
       if (on) {
         disableBiometric(me.id)
+        clearFaceAccount()
         setOn(false)
       } else {
         await registerBiometric(me.id, me.username || me.display_name || 'FLEX')
+        setFaceAccount(me.id) // active aussi la « connexion au visage »
         setOn(true)
-        setMsg('Verrou activé : ton visage/empreinte protège l\'app sur cet appareil.')
+        setMsg('Activé : déverrouille et connecte-toi avec ton visage/empreinte sur cet appareil.')
       }
     } catch {
       setMsg('Activation refusée ou annulée.')

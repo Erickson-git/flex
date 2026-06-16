@@ -13,6 +13,18 @@
 // ─────────────────────────────────────────────────────────────
 
 const KEY = (uid: string) => `flex.biometric.${uid}`
+const FACE_ACCT = 'flex.biometric.account' // dernier compte ayant activé le visage
+
+/** Mémorise le compte utilisable par « connexion au visage » sur cet appareil. */
+export function setFaceAccount(uid: string): void {
+  localStorage.setItem(FACE_ACCT, uid)
+}
+export function getFaceAccount(): string | null {
+  return localStorage.getItem(FACE_ACCT)
+}
+export function clearFaceAccount(): void {
+  localStorage.removeItem(FACE_ACCT)
+}
 
 function toB64(buf: ArrayBuffer): string {
   return btoa(String.fromCharCode(...new Uint8Array(buf)))
