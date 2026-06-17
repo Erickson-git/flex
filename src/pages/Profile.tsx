@@ -14,6 +14,7 @@ import { SecureAccountCard } from '@/components/SecureAccountCard'
 import { ProfileFlexHistory } from '@/components/ProfileFlexHistory'
 import { PushToggle } from '@/components/PushToggle'
 import { BiometricToggle } from '@/components/BiometricToggle'
+import { PrivacyToggle } from '@/components/PrivacyToggle'
 import { InstallApp } from '@/components/InstallApp'
 import { ThemeButton } from '@/components/ThemeButton'
 import { ModeToggle } from '@/components/ModeToggle'
@@ -208,6 +209,8 @@ export default function Profile() {
         <PushToggle />
         {/* Sécurité : verrou facial / empreinte (Face ID, Windows Hello…) */}
         <BiometricToggle />
+        {/* Confidentialité : masquer le statut en ligne */}
+        <PrivacyToggle />
         <SecureAccountCard />
         <ShadowVisitors />
 

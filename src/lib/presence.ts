@@ -1,4 +1,5 @@
 import { DEMO_MODE, supabase } from './supabase'
+import { isOnlineHidden } from './privacy'
 
 // ─────────────────────────────────────────────────────────────
 // Présence temps réel d'un salon de chat : qui est en ligne + « écrit… ».
@@ -30,12 +31,15 @@ export function joinRoomPresence(
     if ((payload as { from?: string })?.from !== meId) opts.onTyping()
   })
   ch.subscribe((status) => {
-    if (status === 'SUBSCRIBED') ch.track({ at: Date.now() })
+    // Confidentialité : si l'utilisateur masque son statut, on REÇOIT la présence
+    // des autres mais on ne SIGNALE PAS la nôtre (pas de track).
+    if (status === 'SUBSCRIBED' && !isOnlineHidden()) ch.track({ at: Date.now() })
   })
 
   let last = 0
   return {
     sendTyping: () => {
+      if (isOnlineHidden()) return // statut masqué → on n'envoie pas « écrit… »
       const now = Date.now()
       if (now - last < 1500) return // throttle : 1 signal / 1,5 s
       last = now

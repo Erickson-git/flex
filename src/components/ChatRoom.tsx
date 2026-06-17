@@ -1,15 +1,17 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronLeft, Copy, CornerUpLeft, Download, Forward, ImagePlus, Loader2, Mic, Phone, Search, Send, Smile, Trash2, Video, X } from 'lucide-react'
+import { ChevronLeft, Copy, CornerUpLeft, Download, Forward, ImagePlus, Loader2, Lock, Mic, Phone, ScanFace, Search, Send, Smile, Trash2, Video, X } from 'lucide-react'
 import type { ChatMessage, Profile } from '@/lib/types'
 import { deleteMessage, fetchRoomMessages, reactMessage, sendRoomMessage, subscribeRoom, touchDmThread } from '@/lib/api'
 import { searchProfiles } from '@/lib/search'
 import { useAuth } from '@/store/useAuth'
 import { isAudioUrl, isVideoUrl, uploadMedia } from '@/lib/upload'
 import { saveAndDownload } from '@/lib/gallery'
-import { toastOk } from '@/lib/toast'
+import { toastOk, toastErr } from '@/lib/toast'
 import { joinRoomPresence, type RoomPresence } from '@/lib/presence'
+import { isChatLocked, lockChat, unlockChat } from '@/lib/chatLock'
+import { biometricEnabled, getFaceAccount, verifyBiometric } from '@/lib/biometric'
 import { notifyUser } from '@/lib/push'
 import { recordNotification } from '@/lib/notifications'
 import { cn, dmRoomId, haptic, looksMalicious, sanitizeText, timeAgo } from '@/lib/utils'
@@ -67,6 +69,7 @@ export function ChatRoom({
   const [peerOnline, setPeerOnline] = useState(false)
   const [peerTyping, setPeerTyping] = useState(false)
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
+  const [unlocked, setUnlocked] = useState(() => !isChatLocked(roomId))
   const [forwardMsg, setForwardMsg] = useState<ChatMessage | null>(null)
   const [fwdQuery, setFwdQuery] = useState('')
   const [fwdResults, setFwdResults] = useState<Profile[]>([])
@@ -123,6 +126,11 @@ export function ChatRoom({
       if (typingTimer.current) clearTimeout(typingTimer.current)
     }
   }, [roomId, me?.id])
+
+  // Verrou de conversation : (re)bloque à l'ouverture si le salon est verrouillé.
+  useEffect(() => {
+    setUnlocked(!isChatLocked(roomId))
+  }, [roomId])
 
   // Recherche de destinataire pour le transfert (débouncée).
   useEffect(() => {
@@ -217,6 +225,33 @@ export function ChatRoom({
   function copyMessage(m: ChatMessage) {
     const txt = m.content?.startsWith('sticker:') ? m.content.slice(8) : m.content
     if (txt) navigator.clipboard?.writeText(txt).then(() => toastOk('Copié ✓')).catch(() => {})
+  }
+
+  // ── Verrou de conversation (Face ID/empreinte) ──────────────────
+  async function toggleLock() {
+    const uid = getFaceAccount()
+    if (isChatLocked(roomId)) {
+      if (uid && (await verifyBiometric(uid).catch(() => false))) {
+        unlockChat(roomId)
+        toastOk('Verrou retiré')
+      }
+    } else {
+      if (!uid || !biometricEnabled(uid)) {
+        toastErr('Active d\'abord le verrou facial dans ton profil.')
+        return
+      }
+      lockChat(roomId)
+      toastOk('Conversation verrouillée 🔒')
+    }
+  }
+
+  async function tryUnlock() {
+    const uid = getFaceAccount()
+    if (!uid) {
+      setUnlocked(true) // pas de biométrie configurée → on n'enferme pas
+      return
+    }
+    if (await verifyBiometric(uid).catch(() => false)) setUnlocked(true)
   }
 
   async function doReact(emoji: string) {
@@ -353,6 +388,9 @@ export function ChatRoom({
               subtitle && <div className="text-xs font-medium text-ink-900/70">{subtitle}</div>
             )}
           </div>
+          <button onClick={toggleLock} aria-label="Verrouiller la conversation" className="grid h-9 w-9 place-items-center rounded-full text-ink-900 active:scale-90">
+            <Lock className={cn('h-5 w-5', isChatLocked(roomId) ? '' : 'opacity-50')} />
+          </button>
           {peer && callAvailable ? (
             <div className="flex items-center gap-1">
               <button onClick={() => startCall(peer, 'audio')} aria-label="Appel audio" className="grid h-9 w-9 place-items-center rounded-full text-ink-900 active:scale-90">
@@ -622,6 +660,23 @@ export function ChatRoom({
               </button>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Écran de verrouillage de la conversation */}
+      {!unlocked && (
+        <div className="fixed inset-0 z-[80] flex flex-col items-center justify-center gap-6 bg-ink-900 px-8 text-center">
+          <div className="grid h-20 w-20 place-items-center rounded-3xl bg-gold/10">
+            <Lock className="h-10 w-10 text-gold" />
+          </div>
+          <div>
+            <h2 className="font-display text-xl font-extrabold">Conversation verrouillée</h2>
+            <p className="mt-1 text-sm text-zinc-400">Déverrouille avec ton visage ou ton empreinte.</p>
+          </div>
+          <button onClick={tryUnlock} className="btn-gold flex items-center gap-2 text-lg">
+            <ScanFace className="h-5 w-5" /> Déverrouiller
+          </button>
+          <button onClick={() => navigate(-1)} className="text-sm font-semibold text-zinc-500">Retour</button>
         </div>
       )}
 
