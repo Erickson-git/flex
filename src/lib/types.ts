@@ -153,6 +153,10 @@ export interface ChatMessage {
   /** Message cité (réponse) : id + aperçu dénormalisé « auteur : extrait ». */
   reply_to?: string | null
   reply_preview?: string | null
+  /** Modifié le… (affiche « modifié »). */
+  edited_at?: string | null
+  /** Supprimé pour tout le monde → affiche « message supprimé ». */
+  deleted?: boolean
   created_at: string
 }
 

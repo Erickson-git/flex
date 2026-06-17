@@ -588,6 +588,18 @@ export async function deleteMessage(messageId: string): Promise<void> {
   await supabase.rpc('delete_message', { p_id: messageId })
 }
 
+/** Modifie le texte d'un de ses messages. */
+export async function editMessage(messageId: string, content: string): Promise<void> {
+  if (DEMO_MODE || !supabase) return
+  await supabase.rpc('edit_message', { p_id: messageId, p_content: content })
+}
+
+/** « Supprimer pour tout le monde » : laisse une trace « message supprimé ». */
+export async function tombstoneMessage(messageId: string): Promise<void> {
+  if (DEMO_MODE || !supabase) return
+  await supabase.rpc('tombstone_message', { p_id: messageId })
+}
+
 const hideoutKey = (id: string) => `flex.hideout.${id}`
 
 export async function fetchSecretMessages(hideoutId: string): Promise<SecretMessage[]> {

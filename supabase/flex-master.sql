@@ -163,6 +163,26 @@ alter table public.flexes add column if not exists media_urls jsonb;
 alter table public.chat_messages add column if not exists reply_to uuid;
 alter table public.chat_messages add column if not exists reply_preview text;
 
+-- ── Chat : modifier + « message supprimé » (Lot 4) ──
+alter table public.chat_messages add column if not exists edited_at timestamptz;
+alter table public.chat_messages add column if not exists deleted boolean not null default false;
+create or replace function public.edit_message(p_id uuid, p_content text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  update public.chat_messages set content = p_content, edited_at = now()
+   where id = p_id and author_id = auth.uid();
+end $$;
+create or replace function public.tombstone_message(p_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  update public.chat_messages set content = '', media_url = null, reaction = null, deleted = true
+   where id = p_id and author_id = auth.uid();
+end $$;
+revoke all on function public.edit_message(uuid, text) from public;
+grant execute on function public.edit_message(uuid, text) to authenticated;
+revoke all on function public.tombstone_message(uuid) from public;
+grant execute on function public.tombstone_message(uuid) to authenticated;
+
 -- ── Découverte par numéro : "ceux qui ont ton numéro te retrouvent" ──
 create or replace function public.find_contacts_on_flex(p_digits text[])
 returns setof public.profiles

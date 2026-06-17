@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronLeft, Copy, CornerUpLeft, Download, Forward, ImagePlus, Loader2, Lock, Mic, Phone, ScanFace, Search, Send, Smile, Trash2, Video, X } from 'lucide-react'
+import { Check, CheckCheck, ChevronLeft, Copy, CornerUpLeft, Download, Forward, ImagePlus, Loader2, Lock, Mic, Pencil, Phone, ScanFace, Search, Send, Smile, Trash2, Video, X } from 'lucide-react'
 import type { ChatMessage, Profile } from '@/lib/types'
-import { deleteMessage, fetchRoomMessages, reactMessage, sendRoomMessage, subscribeRoom, touchDmThread } from '@/lib/api'
+import { editMessage, fetchRoomMessages, reactMessage, sendRoomMessage, subscribeRoom, tombstoneMessage, touchDmThread } from '@/lib/api'
 import { searchProfiles } from '@/lib/search'
 import { useAuth } from '@/store/useAuth'
 import { isAudioUrl, isVideoUrl, uploadMedia } from '@/lib/upload'
@@ -69,6 +69,7 @@ export function ChatRoom({
   const [peerOnline, setPeerOnline] = useState(false)
   const [peerTyping, setPeerTyping] = useState(false)
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
+  const [editMsg, setEditMsg] = useState<ChatMessage | null>(null)
   const [unlocked, setUnlocked] = useState(() => !isChatLocked(roomId))
   const [searchOpen, setSearchOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -188,6 +189,19 @@ export function ChatRoom({
     if ((!raw && !pendingPhoto) || looksMalicious(raw)) return
     const text = sanitizeText(raw, 1000)
     haptic(10)
+    // Mode édition : on modifie le message au lieu d'en envoyer un nouveau.
+    if (editMsg) {
+      const id = editMsg.id
+      setEditMsg(null)
+      setDraft('')
+      setMessages((list) => list.map((x) => (x.id === id ? { ...x, content: text, edited_at: new Date().toISOString() } : x)))
+      try {
+        await editMessage(id, text)
+      } catch {
+        setSendErr(true)
+      }
+      return
+    }
     const photo = pendingPhoto
     const reply = replyTo ? { id: replyTo.id, preview: previewOf(replyTo) } : null
     setDraft('')
@@ -268,9 +282,10 @@ export function ChatRoom({
     const m = actionMsg
     if (!m) return
     setActionMsg(null)
-    setMessages((list) => list.filter((x) => x.id !== m.id))
+    // Supprimer pour tout le monde → laisse une trace « message supprimé ».
+    setMessages((list) => list.map((x) => (x.id === m.id ? { ...x, content: '', media_url: null, reaction: null, deleted: true } : x)))
     try {
-      await deleteMessage(m.id)
+      await tombstoneMessage(m.id)
     } catch {
       /* ignore */
     }
@@ -460,6 +475,10 @@ export function ChatRoom({
                       mine ? 'bg-gold-grad text-ink-900' : 'glass text-zinc-100',
                     )}
                   >
+                    {m.deleted ? (
+                      <p className="px-3.5 py-2 text-sm italic opacity-70">🚫 Message supprimé</p>
+                    ) : (
+                    <>
                     {m.reply_preview && (
                       <div className={cn('mx-2 mt-2 rounded-lg border-l-2 px-2 py-1 text-xs', mine ? 'border-ink-900/40 bg-ink-900/10 text-ink-900/80' : 'border-gold/60 bg-white/5 text-zinc-300')}>
                         {m.reply_preview}
@@ -477,6 +496,8 @@ export function ChatRoom({
                         <img src={m.media_url} alt="" className="w-60 object-cover" />
                       ))}
                     {m.content && <p className="px-3.5 py-2 leading-snug">{m.content}</p>}
+                    </>
+                    )}
                   </div>
                 )}
                 {m.reaction && (
@@ -484,8 +505,10 @@ export function ChatRoom({
                     <span className="inline-block rounded-full bg-ink-800 px-1.5 py-0.5 text-sm shadow-card">{m.reaction}</span>
                   </div>
                 )}
-                <div className={cn('mt-0.5 text-[10px] text-zinc-600', mine ? 'text-right' : 'ml-1')}>
-                  {timeAgo(m.created_at)}
+                <div className={cn('mt-0.5 flex items-center gap-1 text-[10px] text-zinc-600', mine ? 'justify-end' : 'ml-1')}>
+                  {m.edited_at && !m.deleted && <span className="italic">modifié</span>}
+                  <span>{timeAgo(m.created_at)}</span>
+                  {mine && !m.deleted && (peerOnline ? <CheckCheck className="h-3 w-3 text-flex-cyan" /> : <Check className="h-3 w-3" />)}
                 </div>
               </div>
               </div>
@@ -546,6 +569,15 @@ export function ChatRoom({
               {s}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Barre d'édition au-dessus de la saisie */}
+      {editMsg && (
+        <div className="mx-3 mb-1 flex items-center gap-2 rounded-xl border-l-2 border-flex-cyan/70 bg-white/5 px-3 py-1.5">
+          <Pencil className="h-4 w-4 shrink-0 text-flex-cyan" />
+          <span className="min-w-0 flex-1 truncate text-xs text-zinc-300">Modification du message…</span>
+          <button onClick={() => { setEditMsg(null); setDraft('') }} className="shrink-0 text-zinc-500"><X className="h-4 w-4" /></button>
         </div>
       )}
 
@@ -677,9 +709,17 @@ export function ChatRoom({
                 <Download className="h-4 w-4" /> Télécharger dans ma galerie
               </button>
             )}
-            {actionMsg.author_id === me.id && (
+            {actionMsg.author_id === me.id && !!actionMsg.content && !actionMsg.content.startsWith('sticker:') && !actionMsg.deleted && (
+              <button
+                onClick={() => { const m = actionMsg; setActionMsg(null); setReplyTo(null); setEditMsg(m); setDraft(m.content) }}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 py-3 text-sm font-bold text-zinc-200 active:scale-[0.98]"
+              >
+                <Pencil className="h-4 w-4" /> Modifier
+              </button>
+            )}
+            {actionMsg.author_id === me.id && !actionMsg.deleted && (
               <button onClick={doDelete} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-flex-pink/30 py-3 text-sm font-bold text-flex-pink active:scale-[0.98]">
-                <Trash2 className="h-4 w-4" /> Supprimer
+                <Trash2 className="h-4 w-4" /> Supprimer pour tout le monde
               </button>
             )}
           </div>
