@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowDownToLine, Apple, Globe, Share2, Smartphone, X } from 'lucide-react'
 import { canInstall, isIOS, promptInstall } from '@/lib/install'
 import { ANDROID_APK_URL, IOS_APP_URL } from '@/lib/appLinks'
+import { toastOk } from '@/lib/toast'
 import { BrandLogo } from './BrandLogo'
 import { haptic } from '@/lib/utils'
 
@@ -22,6 +23,7 @@ export function BrandSheet({ open, onClose }: { open: boolean; onClose: () => vo
         await navigator.share({ title: 'FLEX', text: 'Rejoins-moi sur FLEX ✦ — crée ton compte', url })
       } else {
         await navigator.clipboard.writeText(url)
+        toastOk('Lien copié ✓')
       }
     } catch {
       /* annulé */

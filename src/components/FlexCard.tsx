@@ -10,6 +10,7 @@ import { useAuth } from '@/store/useAuth'
 import { translateText } from '@/lib/translate'
 import { recordEngagement } from '@/lib/engagement'
 import { saveAndDownload } from '@/lib/gallery'
+import { toastOk } from '@/lib/toast'
 import { pinHash } from '@/lib/pin'
 import { isAudioUrl, isVideoUrl } from '@/lib/upload'
 import { trackByUrl } from '@/lib/audioLibrary'
@@ -119,6 +120,7 @@ export function FlexCard({ flex, index = 0 }: { flex: Flex; index?: number }) {
     setSaved(true)
     try {
       await saveAndDownload(flex.media_url, author ? `Publication de @${author.username}` : 'Publication')
+      toastOk('Enregistré dans ta galerie ✓')
     } catch {
       /* ignore */
     }

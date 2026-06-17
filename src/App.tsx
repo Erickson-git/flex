@@ -16,6 +16,8 @@ import { CallProvider } from '@/components/CallProvider'
 import { UpdatePrompt } from '@/components/UpdatePrompt'
 import { BiometricGate } from '@/components/BiometricGate'
 import { PasswordGate } from '@/components/PasswordGate'
+import { Toaster } from '@/components/Toaster'
+import { OfflineBanner } from '@/components/OfflineBanner'
 import { BrandLogo } from '@/components/BrandLogo'
 import { isAdmin } from '@/lib/premium'
 
@@ -187,6 +189,8 @@ export default function App() {
     <EmojiBurstProvider>
       <CallProvider>
       <UpdatePrompt />
+      <Toaster />
+      <OfflineBanner />
       {/* Verrou biométrique (hors pages d'auth). La complétion du compte (email/
           téléphone) est OPTIONNELLE et se fait à tout moment depuis le profil :
           plus de blocage à l'ouverture. */}

@@ -193,8 +193,19 @@ export default function FlexFlow() {
       </div>
 
       {loading ? (
-        <div className="grid place-items-center py-24">
-          <Loader2 className="h-8 w-8 animate-spin text-gold" />
+        <div className="space-y-4 px-4 pt-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="glass animate-pulse overflow-hidden rounded-3xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-white/10" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-1/3 rounded bg-white/10" />
+                  <div className="h-2 w-1/4 rounded bg-white/5" />
+                </div>
+              </div>
+              <div className="mt-4 aspect-[4/5] w-full rounded-2xl bg-white/[0.06]" />
+            </div>
+          ))}
         </div>
       ) : (
         <div className="space-y-4 px-4 pt-4">
