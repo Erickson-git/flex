@@ -70,6 +70,8 @@ export function ChatRoom({
   const [peerTyping, setPeerTyping] = useState(false)
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
   const [unlocked, setUnlocked] = useState(() => !isChatLocked(roomId))
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [search, setSearch] = useState('')
   const [forwardMsg, setForwardMsg] = useState<ChatMessage | null>(null)
   const [fwdQuery, setFwdQuery] = useState('')
   const [fwdResults, setFwdResults] = useState<Profile[]>([])
@@ -388,6 +390,9 @@ export function ChatRoom({
               subtitle && <div className="text-xs font-medium text-ink-900/70">{subtitle}</div>
             )}
           </div>
+          <button onClick={() => { setSearchOpen((v) => !v); setSearch('') }} aria-label="Rechercher" className="grid h-9 w-9 place-items-center rounded-full text-ink-900 active:scale-90">
+            <Search className="h-5 w-5" />
+          </button>
           <button onClick={toggleLock} aria-label="Verrouiller la conversation" className="grid h-9 w-9 place-items-center rounded-full text-ink-900 active:scale-90">
             <Lock className={cn('h-5 w-5', isChatLocked(roomId) ? '' : 'opacity-50')} />
           </button>
@@ -410,12 +415,30 @@ export function ChatRoom({
         {headerExtra}
       </header>
 
+      {/* Barre de recherche dans la conversation */}
+      {searchOpen && (
+        <div className="flex items-center gap-2 border-b border-white/5 bg-ink-900/60 px-3 py-2">
+          <Search className="h-4 w-4 text-zinc-500" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher dans la conversation…"
+            autoFocus
+            className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-600"
+          />
+          <button onClick={() => { setSearchOpen(false); setSearch('') }} className="text-zinc-500"><X className="h-5 w-5" /></button>
+        </div>
+      )}
+
       {/* Fil */}
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-4">
-        {messages.map((m, idx) => {
+        {(search.trim()
+          ? messages.filter((m) => (m.content || '').toLowerCase().includes(search.trim().toLowerCase()))
+          : messages
+        ).map((m, idx, arr) => {
           const mine = m.author_id === me.id
           const sticker = m.content?.startsWith('sticker:') ? m.content.slice(8) : null
-          const prev = messages[idx - 1]
+          const prev = arr[idx - 1]
           const showDate = !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString()
           return (
             <Fragment key={m.id}>

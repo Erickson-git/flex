@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Loader2, Plus, Search } from 'lucide-react'
+import { BellOff, Loader2, Pin, Plus, Search, X } from 'lucide-react'
 import type { DirectThread, Profile } from '@/lib/types'
 import { fetchThreads, subscribeThreads } from '@/lib/api'
 import { searchProfiles, type SearchResult } from '@/lib/groupCall'
 import { fetchActiveStories, groupStories, type Story } from '@/lib/stories'
+import { isMuted, isPinned, toggleMute, togglePin } from '@/lib/chatPrefs'
 import { useAuth } from '@/store/useAuth'
 import { Avatar } from '@/components/Avatar'
 import { StoryViewer } from '@/components/StoryViewer'
@@ -39,6 +40,22 @@ export default function Directs() {
   const [stories, setStories] = useState<Story[]>([])
   const [viewer, setViewer] = useState<Story[] | null>(null)
   const [showAdd, setShowAdd] = useState(false)
+  const [menuThread, setMenuThread] = useState<DirectThread | null>(null)
+  const [, setTick] = useState(0) // force le re-rendu après épingler/sourdine
+  const pressTimer = useRef<number | null>(null)
+  const longPressed = useRef(false)
+
+  function startPress(t: DirectThread) {
+    longPressed.current = false
+    pressTimer.current = window.setTimeout(() => {
+      longPressed.current = true
+      haptic(20)
+      setMenuThread(t)
+    }, 500)
+  }
+  function endPress() {
+    if (pressTimer.current) clearTimeout(pressTimer.current)
+  }
 
   useEffect(() => {
     const load = () => fetchThreads().then(setThreads).catch(() => {})
@@ -151,7 +168,9 @@ export default function Directs() {
             ) : threads.length === 0 ? (
               <div className="py-14 text-center text-sm text-zinc-600">Aucune conversation. Recherche un pseudo pour démarrer ✦</div>
             ) : (
-              threads.map((t, i) => {
+              [...threads]
+                .sort((a, b) => Number(isPinned(b.id)) - Number(isPinned(a.id)))
+                .map((t, i) => {
                 const unread = !!t.last_sender && t.last_sender !== me?.id && new Date(t.last_at).getTime() > (reads[t.id] || 0)
                 const preview = (t.last_sender === me?.id ? 'Toi : ' : '') + (t.last_message || '')
                 return (
@@ -160,7 +179,13 @@ export default function Directs() {
                     initial={{ opacity: 0, x: -12 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: Math.min(i * 0.04, 0.3) }}
+                    onMouseDown={() => startPress(t)}
+                    onMouseUp={endPress}
+                    onMouseLeave={endPress}
+                    onTouchStart={() => startPress(t)}
+                    onTouchEnd={endPress}
                     onClick={() => {
+                      if (longPressed.current) { longPressed.current = false; return }
                       haptic(8)
                       markRead(t.id)
                       navigate(`/app/directs/${t.id}`, { state: t })
@@ -169,12 +194,16 @@ export default function Directs() {
                   >
                     <Avatar name={t.peer.display_name} url={t.peer.avatar_url} size={54} ring={unread} />
                     <div className="min-w-0 flex-1">
-                      <div className={cn('truncate', unread ? 'font-bold text-white' : 'font-semibold text-white')}>{t.peer.display_name}</div>
+                      <div className="flex items-center gap-1.5">
+                        {isPinned(t.id) && <Pin className="h-3.5 w-3.5 shrink-0 text-gold" />}
+                        <span className={cn('truncate', unread ? 'font-bold text-white' : 'font-semibold text-white')}>{t.peer.display_name}</span>
+                        {isMuted(t.id) && <BellOff className="h-3.5 w-3.5 shrink-0 text-zinc-500" />}
+                      </div>
                       <div className={cn('truncate text-sm', unread ? 'font-semibold text-zinc-200' : 'text-zinc-400')}>{preview}</div>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       <span className="text-[11px] text-zinc-600">{timeAgo(t.last_at)}</span>
-                      {unread && <span className="h-2.5 w-2.5 rounded-full bg-flex-pink" />}
+                      {unread && !isMuted(t.id) && <span className="h-2.5 w-2.5 rounded-full bg-flex-pink" />}
                     </div>
                   </motion.button>
                 )
@@ -182,6 +211,32 @@ export default function Directs() {
             )}
           </div>
         </>
+      )}
+
+      {/* Menu conversation (appui long) : épingler / sourdine */}
+      {menuThread && (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center" onClick={() => setMenuThread(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="safe-bottom w-full max-w-md rounded-t-3xl border-t border-white/10 bg-ink-800/95 p-4 backdrop-blur-xl sm:rounded-3xl sm:border">
+            <div className="mb-2 flex items-center justify-between px-1">
+              <span className="truncate font-display text-lg font-extrabold">{menuThread.peer.display_name}</span>
+              <button onClick={() => setMenuThread(null)} className="text-zinc-500"><X className="h-6 w-6" /></button>
+            </div>
+            <button
+              onClick={() => { togglePin(menuThread.id); setMenuThread(null); setTick((n) => n + 1) }}
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-3.5 text-left active:bg-white/5"
+            >
+              <Pin className="h-5 w-5 text-gold" />
+              <span className="font-semibold text-white">{isPinned(menuThread.id) ? 'Désépingler' : 'Épingler en haut'}</span>
+            </button>
+            <button
+              onClick={() => { toggleMute(menuThread.id); setMenuThread(null); setTick((n) => n + 1) }}
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-3.5 text-left active:bg-white/5"
+            >
+              <BellOff className="h-5 w-5 text-flex-cyan" />
+              <span className="font-semibold text-white">{isMuted(menuThread.id) ? 'Réactiver les notifications' : 'Mettre en sourdine'}</span>
+            </button>
+          </div>
+        </div>
       )}
 
       {viewer && <StoryViewer stories={viewer} onClose={() => setViewer(null)} onDeleted={refetchStories} />}
