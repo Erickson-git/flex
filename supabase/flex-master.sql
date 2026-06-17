@@ -159,6 +159,10 @@ create index if not exists profiles_phone_idx on public.profiles (phone);
 -- ── Vidéo longue découpée : liste ordonnée de segments ≤ 1 min ──
 alter table public.flexes add column if not exists media_urls jsonb;
 
+-- ── Chat : réponse / citation de message (façon WhatsApp) ──
+alter table public.chat_messages add column if not exists reply_to uuid;
+alter table public.chat_messages add column if not exists reply_preview text;
+
 -- ── Découverte par numéro : "ceux qui ont ton numéro te retrouvent" ──
 create or replace function public.find_contacts_on_flex(p_digits text[])
 returns setof public.profiles

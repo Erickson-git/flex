@@ -150,6 +150,9 @@ export interface ChatMessage {
   content: string
   media_url?: string | null
   reaction?: string | null
+  /** Message cité (réponse) : id + aperçu dénormalisé « auteur : extrait ». */
+  reply_to?: string | null
+  reply_preview?: string | null
   created_at: string
 }
 

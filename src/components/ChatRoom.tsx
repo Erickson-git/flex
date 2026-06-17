@@ -1,16 +1,18 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronLeft, Download, ImagePlus, Loader2, Mic, Phone, Send, Smile, Trash2, Video, X } from 'lucide-react'
+import { ChevronLeft, Copy, CornerUpLeft, Download, Forward, ImagePlus, Loader2, Mic, Phone, Search, Send, Smile, Trash2, Video, X } from 'lucide-react'
 import type { ChatMessage, Profile } from '@/lib/types'
 import { deleteMessage, fetchRoomMessages, reactMessage, sendRoomMessage, subscribeRoom, touchDmThread } from '@/lib/api'
+import { searchProfiles } from '@/lib/search'
 import { useAuth } from '@/store/useAuth'
 import { isAudioUrl, isVideoUrl, uploadMedia } from '@/lib/upload'
 import { saveAndDownload } from '@/lib/gallery'
+import { toastOk } from '@/lib/toast'
 import { joinRoomPresence, type RoomPresence } from '@/lib/presence'
 import { notifyUser } from '@/lib/push'
 import { recordNotification } from '@/lib/notifications'
-import { cn, haptic, looksMalicious, sanitizeText, timeAgo } from '@/lib/utils'
+import { cn, dmRoomId, haptic, looksMalicious, sanitizeText, timeAgo } from '@/lib/utils'
 import { Avatar } from './Avatar'
 import { useCall } from './CallProvider'
 import { useEmojiBurst } from './EmojiBurst'
@@ -19,6 +21,17 @@ const QUICK_EMOJIS = ['🔥', '😍', '💀', '👑', '💯', '🤯']
 // prettier-ignore
 const STICKERS = ['🔥','😂','😍','🥹','😎','😭','🤯','💀','👑','💯','🙏','👍','👏','🎉','💖','💔','🥳','😴','🤝','✨','💪','🤙','😏','🫶','🙌','🤷','😡','🤔','👀','🫡','🥶','🤡']
 const REACTIONS = ['❤️', '😂', '😮', '😢', '🙏', '🔥']
+
+/** Étiquette de séparateur de date : Aujourd'hui / Hier / date. */
+function dayLabel(iso: string): string {
+  const d = new Date(iso)
+  const today = new Date()
+  const yest = new Date()
+  yest.setDate(today.getDate() - 1)
+  if (d.toDateString() === today.toDateString()) return "Aujourd'hui"
+  if (d.toDateString() === yest.toDateString()) return 'Hier'
+  return d.toLocaleDateString('fr', { day: 'numeric', month: 'long' })
+}
 
 /** Salle de chat temps réel partagée par les Squads et les Directs. */
 export function ChatRoom({
@@ -53,6 +66,10 @@ export function ChatRoom({
   const [recSec, setRecSec] = useState(0)
   const [peerOnline, setPeerOnline] = useState(false)
   const [peerTyping, setPeerTyping] = useState(false)
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
+  const [forwardMsg, setForwardMsg] = useState<ChatMessage | null>(null)
+  const [fwdQuery, setFwdQuery] = useState('')
+  const [fwdResults, setFwdResults] = useState<Profile[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const presenceRef = useRef<RoomPresence | null>(null)
@@ -107,12 +124,36 @@ export function ChatRoom({
     }
   }, [roomId, me?.id])
 
+  // Recherche de destinataire pour le transfert (débouncée).
+  useEffect(() => {
+    if (!forwardMsg) return
+    const q = fwdQuery.trim()
+    if (!q) {
+      setFwdResults([])
+      return
+    }
+    const t = setTimeout(() => searchProfiles(q).then(setFwdResults).catch(() => {}), 300)
+    return () => clearTimeout(t)
+  }, [fwdQuery, forwardMsg])
+
   if (!me) return null
 
-  async function deliver(text: string, photo: string | null): Promise<boolean> {
+  // Aperçu court d'un message (pour la citation / le transfert).
+  function previewOf(m: ChatMessage): string {
+    const body = m.content?.startsWith('sticker:')
+      ? m.content.slice(8)
+      : m.content || (m.media_url ? '📎 Média' : '')
+    return `${m.author_name}: ${body}`.slice(0, 90)
+  }
+
+  async function deliver(
+    text: string,
+    photo: string | null,
+    reply: { id: string; preview: string } | null = null,
+  ): Promise<boolean> {
     setSendErr(false)
     try {
-      const msg = await sendRoomMessage(roomId, text, photo, me!)
+      const msg = await sendRoomMessage(roomId, text, photo, me!, reply)
       setMessages((m) => [...m, msg])
       if (notifyUserId) {
         const preview = text.startsWith('sticker:') ? text.slice(8) : text || '📎 Média'
@@ -138,13 +179,16 @@ export function ChatRoom({
     const text = sanitizeText(raw, 1000)
     haptic(10)
     const photo = pendingPhoto
+    const reply = replyTo ? { id: replyTo.id, preview: previewOf(replyTo) } : null
     setDraft('')
     setPendingPhoto(null)
-    const ok = await deliver(text, photo)
+    setReplyTo(null)
+    const ok = await deliver(text, photo, reply)
     if (!ok) {
       // Échec (RLS / réseau) : on restaure le brouillon, rien n'est perdu.
       setDraft(raw)
       setPendingPhoto(photo)
+      setReplyTo(replyTo)
     }
   }
 
@@ -152,6 +196,27 @@ export function ChatRoom({
     haptic(8)
     setShowStickers(false)
     await deliver('sticker:' + emoji, null)
+  }
+
+  // Transfère le message sélectionné vers la conversation d'un autre utilisateur.
+  async function doForward(p: Profile) {
+    if (!forwardMsg || !me) return
+    const room = dmRoomId(me.id, p.id)
+    try {
+      await sendRoomMessage(room, forwardMsg.content || '', forwardMsg.media_url ?? null, me)
+      touchDmThread(room, p.id, previewOf(forwardMsg))
+      toastOk('Transféré à @' + p.username)
+    } catch {
+      setSendErr(true)
+    }
+    setForwardMsg(null)
+    setFwdQuery('')
+    setFwdResults([])
+  }
+
+  function copyMessage(m: ChatMessage) {
+    const txt = m.content?.startsWith('sticker:') ? m.content.slice(8) : m.content
+    if (txt) navigator.clipboard?.writeText(txt).then(() => toastOk('Copié ✓')).catch(() => {})
   }
 
   async function doReact(emoji: string) {
@@ -309,11 +374,19 @@ export function ChatRoom({
 
       {/* Fil */}
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-4">
-        {messages.map((m) => {
+        {messages.map((m, idx) => {
           const mine = m.author_id === me.id
           const sticker = m.content?.startsWith('sticker:') ? m.content.slice(8) : null
+          const prev = messages[idx - 1]
+          const showDate = !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString()
           return (
-            <div key={m.id} className={cn('flex items-end gap-2', mine ? 'justify-end' : 'justify-start')}>
+            <Fragment key={m.id}>
+              {showDate && (
+                <div className="flex justify-center py-1">
+                  <span className="rounded-full bg-ink-900/50 px-3 py-1 text-[10px] font-semibold text-zinc-400 backdrop-blur">{dayLabel(m.created_at)}</span>
+                </div>
+              )}
+              <div className={cn('flex items-end gap-2', mine ? 'justify-end' : 'justify-start')}>
               {!mine && <Avatar name={m.author_name} url={m.author_avatar} size={30} />}
               <div className={cn('max-w-[76%]', mine && 'items-end')} onClick={() => setActionMsg(m)}>
                 {!mine && <div className="mb-0.5 ml-1 text-[11px] font-semibold text-zinc-500">{m.author_name}</div>}
@@ -326,6 +399,11 @@ export function ChatRoom({
                       mine ? 'bg-gold-grad text-ink-900' : 'glass text-zinc-100',
                     )}
                   >
+                    {m.reply_preview && (
+                      <div className={cn('mx-2 mt-2 rounded-lg border-l-2 px-2 py-1 text-xs', mine ? 'border-ink-900/40 bg-ink-900/10 text-ink-900/80' : 'border-gold/60 bg-white/5 text-zinc-300')}>
+                        {m.reply_preview}
+                      </div>
+                    )}
                     {m.media_url &&
                       (isVideoUrl(m.media_url) ? (
                         <video src={m.media_url} controls playsInline preload="metadata" className="w-60 bg-black" />
@@ -349,7 +427,8 @@ export function ChatRoom({
                   {timeAgo(m.created_at)}
                 </div>
               </div>
-            </div>
+              </div>
+            </Fragment>
           )
         })}
       </div>
@@ -406,6 +485,15 @@ export function ChatRoom({
               {s}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Barre de réponse (citation) au-dessus de la saisie */}
+      {replyTo && (
+        <div className="mx-3 mb-1 flex items-center gap-2 rounded-xl border-l-2 border-gold/70 bg-white/5 px-3 py-1.5">
+          <CornerUpLeft className="h-4 w-4 shrink-0 text-gold" />
+          <span className="min-w-0 flex-1 truncate text-xs text-zinc-300">{previewOf(replyTo)}</span>
+          <button onClick={() => setReplyTo(null)} className="shrink-0 text-zinc-500"><X className="h-4 w-4" /></button>
         </div>
       )}
 
@@ -493,6 +581,29 @@ export function ChatRoom({
                 </button>
               ))}
             </div>
+
+            {/* Répondre · Copier · Transférer */}
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <button
+                onClick={() => { const m = actionMsg; setActionMsg(null); setReplyTo(m) }}
+                className="flex flex-col items-center gap-1 rounded-2xl border border-white/10 py-2.5 text-[11px] font-semibold text-zinc-200 active:scale-95"
+              >
+                <CornerUpLeft className="h-4 w-4 text-flex-cyan" /> Répondre
+              </button>
+              <button
+                onClick={() => { const m = actionMsg; setActionMsg(null); if (m) copyMessage(m) }}
+                className="flex flex-col items-center gap-1 rounded-2xl border border-white/10 py-2.5 text-[11px] font-semibold text-zinc-200 active:scale-95"
+              >
+                <Copy className="h-4 w-4 text-flex-violet" /> Copier
+              </button>
+              <button
+                onClick={() => { const m = actionMsg; setActionMsg(null); setForwardMsg(m) }}
+                className="flex flex-col items-center gap-1 rounded-2xl border border-white/10 py-2.5 text-[11px] font-semibold text-zinc-200 active:scale-95"
+              >
+                <Forward className="h-4 w-4 text-gold" /> Transférer
+              </button>
+            </div>
+
             {actionMsg.media_url && (
               <button
                 onClick={() => {
@@ -510,6 +621,44 @@ export function ChatRoom({
                 <Trash2 className="h-4 w-4" /> Supprimer
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Fenêtre de transfert : choisir un destinataire */}
+      {forwardMsg && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center" onClick={() => { setForwardMsg(null); setFwdQuery('') }}>
+          <div onClick={(e) => e.stopPropagation()} className="safe-bottom w-full max-w-md rounded-t-3xl border-t border-white/10 bg-ink-800/95 p-5 backdrop-blur-xl sm:rounded-3xl sm:border">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="flex items-center gap-2 font-display text-lg font-extrabold"><Forward className="h-5 w-5 text-gold" /> Transférer à…</h2>
+              <button onClick={() => { setForwardMsg(null); setFwdQuery('') }} className="text-zinc-500"><X className="h-6 w-6" /></button>
+            </div>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+              <input
+                value={fwdQuery}
+                onChange={(e) => setFwdQuery(e.target.value)}
+                placeholder="Rechercher un pseudo ou numéro…"
+                autoFocus
+                className="w-full rounded-2xl border border-white/10 bg-white/5 py-3 pl-11 pr-4 text-white outline-none placeholder:text-zinc-600 focus:border-gold/40"
+                autoCapitalize="none"
+              />
+            </div>
+            <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
+              {fwdResults.filter((p) => p.id !== me.id).map((p) => (
+                <button key={p.id} onClick={() => doForward(p)} className="flex w-full items-center gap-3 rounded-2xl border border-white/5 bg-ink-900/40 p-2.5 text-left active:scale-[0.99]">
+                  <Avatar name={p.display_name} url={p.avatar_url} size={38} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-bold text-white">{p.display_name}</div>
+                    <div className="truncate text-xs text-zinc-500">@{p.username}</div>
+                  </div>
+                  <Forward className="h-4 w-4 shrink-0 text-gold" />
+                </button>
+              ))}
+              {fwdQuery.trim() && fwdResults.length === 0 && (
+                <p className="py-6 text-center text-sm text-zinc-600">Aucun résultat.</p>
+              )}
+            </div>
           </div>
         </div>
       )}
