@@ -163,6 +163,10 @@ alter table public.flexes add column if not exists media_urls jsonb;
 alter table public.chat_messages add column if not exists reply_to uuid;
 alter table public.chat_messages add column if not exists reply_preview text;
 
+-- ── Chat : messages éphémères (Lot 5) ──
+alter table public.chat_messages add column if not exists expires_at timestamptz;
+create index if not exists chat_expires_idx on public.chat_messages (expires_at);
+
 -- ── Chat : modifier + « message supprimé » (Lot 4) ──
 alter table public.chat_messages add column if not exists edited_at timestamptz;
 alter table public.chat_messages add column if not exists deleted boolean not null default false;

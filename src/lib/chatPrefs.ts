@@ -5,6 +5,7 @@
 
 const PIN = 'flex.pinnedChats'
 const MUTE = 'flex.mutedChats'
+const ARCHIVE = 'flex.archivedChats'
 
 function read(key: string): string[] {
   try {
@@ -21,5 +22,7 @@ function toggle(key: string, id: string): void {
 
 export const isPinned = (id: string) => read(PIN).includes(id)
 export const isMuted = (id: string) => read(MUTE).includes(id)
+export const isArchived = (id: string) => read(ARCHIVE).includes(id)
 export const togglePin = (id: string) => toggle(PIN, id)
 export const toggleMute = (id: string) => toggle(MUTE, id)
+export const toggleArchive = (id: string) => toggle(ARCHIVE, id)

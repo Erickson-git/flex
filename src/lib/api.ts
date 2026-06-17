@@ -458,6 +458,7 @@ export async function sendRoomMessage(
   media: string | null,
   me: Profile,
   reply: { id: string; preview: string } | null = null,
+  expiresAt: string | null = null,
 ): Promise<ChatMessage> {
   const msg: ChatMessage = {
     id: uid(),
@@ -470,6 +471,7 @@ export async function sendRoomMessage(
     reaction: null,
     reply_to: reply?.id ?? null,
     reply_preview: reply?.preview ?? null,
+    expires_at: expiresAt,
     created_at: new Date().toISOString(),
   }
   if (DEMO_MODE) {
@@ -489,6 +491,7 @@ export async function sendRoomMessage(
       content,
       media_url: media,
       ...(reply ? { reply_to: reply.id, reply_preview: reply.preview } : {}),
+      ...(expiresAt ? { expires_at: expiresAt } : {}),
     })
     .select('*')
     .single()

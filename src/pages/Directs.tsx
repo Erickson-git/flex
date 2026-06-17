@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { BellOff, Loader2, Pin, Plus, Search, X } from 'lucide-react'
+import { Archive, BellOff, Loader2, Pin, Plus, Search, X } from 'lucide-react'
 import type { DirectThread, Profile } from '@/lib/types'
 import { fetchThreads, subscribeThreads } from '@/lib/api'
 import { searchProfiles, type SearchResult } from '@/lib/groupCall'
 import { fetchActiveStories, groupStories, type Story } from '@/lib/stories'
-import { isMuted, isPinned, toggleMute, togglePin } from '@/lib/chatPrefs'
+import { isArchived, isMuted, isPinned, toggleArchive, toggleMute, togglePin } from '@/lib/chatPrefs'
 import { useAuth } from '@/store/useAuth'
 import { Avatar } from '@/components/Avatar'
 import { StoryViewer } from '@/components/StoryViewer'
@@ -41,7 +41,8 @@ export default function Directs() {
   const [viewer, setViewer] = useState<Story[] | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [menuThread, setMenuThread] = useState<DirectThread | null>(null)
-  const [, setTick] = useState(0) // force le re-rendu après épingler/sourdine
+  const [showArchived, setShowArchived] = useState(false)
+  const [, setTick] = useState(0) // force le re-rendu après épingler/sourdine/archiver
   const pressTimer = useRef<number | null>(null)
   const longPressed = useRef(false)
 
@@ -168,7 +169,21 @@ export default function Directs() {
             ) : threads.length === 0 ? (
               <div className="py-14 text-center text-sm text-zinc-600">Aucune conversation. Recherche un pseudo pour démarrer ✦</div>
             ) : (
-              [...threads]
+              <>
+              {!showArchived && threads.some((t) => isArchived(t.id)) && (
+                <button onClick={() => setShowArchived(true)} className="mb-1 flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-zinc-300 active:bg-white/5">
+                  <Archive className="h-5 w-5 text-zinc-500" />
+                  <span className="font-semibold">Archivées</span>
+                  <span className="ml-auto text-xs text-zinc-500">{threads.filter((t) => isArchived(t.id)).length}</span>
+                </button>
+              )}
+              {showArchived && (
+                <button onClick={() => setShowArchived(false)} className="mb-1 flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm font-semibold text-gold active:bg-white/5">
+                  ← Conversations
+                </button>
+              )}
+              {[...threads]
+                .filter((t) => isArchived(t.id) === showArchived)
                 .sort((a, b) => Number(isPinned(b.id)) - Number(isPinned(a.id)))
                 .map((t, i) => {
                 const unread = !!t.last_sender && t.last_sender !== me?.id && new Date(t.last_at).getTime() > (reads[t.id] || 0)
@@ -207,7 +222,8 @@ export default function Directs() {
                     </div>
                   </motion.button>
                 )
-              })
+              })}
+              </>
             )}
           </div>
         </>
@@ -234,6 +250,13 @@ export default function Directs() {
             >
               <BellOff className="h-5 w-5 text-flex-cyan" />
               <span className="font-semibold text-white">{isMuted(menuThread.id) ? 'Réactiver les notifications' : 'Mettre en sourdine'}</span>
+            </button>
+            <button
+              onClick={() => { toggleArchive(menuThread.id); setMenuThread(null); setTick((n) => n + 1) }}
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-3.5 text-left active:bg-white/5"
+            >
+              <Archive className="h-5 w-5 text-zinc-400" />
+              <span className="font-semibold text-white">{isArchived(menuThread.id) ? 'Désarchiver' : 'Archiver'}</span>
             </button>
           </div>
         </div>

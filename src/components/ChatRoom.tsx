@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, CheckCheck, ChevronLeft, Copy, CornerUpLeft, Download, Forward, ImagePlus, Loader2, Lock, Mic, Pencil, Phone, ScanFace, Search, Send, Smile, Trash2, Video, X } from 'lucide-react'
+import { Check, CheckCheck, ChevronLeft, Copy, CornerUpLeft, Download, Forward, ImagePlus, Loader2, Lock, Mic, Pencil, Phone, ScanFace, Search, Send, Smile, Timer, Trash2, Video, X } from 'lucide-react'
 import type { ChatMessage, Profile } from '@/lib/types'
 import { editMessage, fetchRoomMessages, reactMessage, sendRoomMessage, subscribeRoom, tombstoneMessage, touchDmThread } from '@/lib/api'
 import { searchProfiles } from '@/lib/search'
@@ -11,6 +11,7 @@ import { saveAndDownload } from '@/lib/gallery'
 import { toastOk, toastErr } from '@/lib/toast'
 import { joinRoomPresence, type RoomPresence } from '@/lib/presence'
 import { isChatLocked, lockChat, unlockChat } from '@/lib/chatLock'
+import { expiryFor, getEphemeral, isExpired, setEphemeral } from '@/lib/ephemeral'
 import { biometricEnabled, getFaceAccount, verifyBiometric } from '@/lib/biometric'
 import { notifyUser } from '@/lib/push'
 import { recordNotification } from '@/lib/notifications'
@@ -73,6 +74,7 @@ export function ChatRoom({
   const [unlocked, setUnlocked] = useState(() => !isChatLocked(roomId))
   const [searchOpen, setSearchOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [ephemeralSec, setEphemeralSec] = useState(() => getEphemeral(roomId))
   const [forwardMsg, setForwardMsg] = useState<ChatMessage | null>(null)
   const [fwdQuery, setFwdQuery] = useState('')
   const [fwdResults, setFwdResults] = useState<Profile[]>([])
@@ -133,6 +135,7 @@ export function ChatRoom({
   // Verrou de conversation : (re)bloque à l'ouverture si le salon est verrouillé.
   useEffect(() => {
     setUnlocked(!isChatLocked(roomId))
+    setEphemeralSec(getEphemeral(roomId))
   }, [roomId])
 
   // Recherche de destinataire pour le transfert (débouncée).
@@ -164,7 +167,7 @@ export function ChatRoom({
   ): Promise<boolean> {
     setSendErr(false)
     try {
-      const msg = await sendRoomMessage(roomId, text, photo, me!, reply)
+      const msg = await sendRoomMessage(roomId, text, photo, me!, reply, expiryFor(roomId))
       setMessages((m) => [...m, msg])
       if (notifyUserId) {
         const preview = text.startsWith('sticker:') ? text.slice(8) : text || '📎 Média'
@@ -241,6 +244,15 @@ export function ChatRoom({
   function copyMessage(m: ChatMessage) {
     const txt = m.content?.startsWith('sticker:') ? m.content.slice(8) : m.content
     if (txt) navigator.clipboard?.writeText(txt).then(() => toastOk('Copié ✓')).catch(() => {})
+  }
+
+  // Messages éphémères : Désactivé → 24 h → 7 jours → Désactivé.
+  function cycleEphemeral() {
+    const next = ephemeralSec === 0 ? 86400 : ephemeralSec === 86400 ? 604800 : 0
+    setEphemeral(roomId, next)
+    setEphemeralSec(next)
+    haptic(10)
+    toastOk(next === 0 ? 'Messages éphémères désactivés' : next === 86400 ? 'Messages éphémères : 24 h' : 'Messages éphémères : 7 jours')
   }
 
   // ── Verrou de conversation (Face ID/empreinte) ──────────────────
@@ -405,6 +417,9 @@ export function ChatRoom({
               subtitle && <div className="text-xs font-medium text-ink-900/70">{subtitle}</div>
             )}
           </div>
+          <button onClick={cycleEphemeral} aria-label="Messages éphémères" className="grid h-9 w-9 place-items-center rounded-full text-ink-900 active:scale-90">
+            <Timer className={cn('h-5 w-5', ephemeralSec > 0 ? '' : 'opacity-50')} />
+          </button>
           <button onClick={() => { setSearchOpen((v) => !v); setSearch('') }} aria-label="Rechercher" className="grid h-9 w-9 place-items-center rounded-full text-ink-900 active:scale-90">
             <Search className="h-5 w-5" />
           </button>
@@ -447,10 +462,10 @@ export function ChatRoom({
 
       {/* Fil */}
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-4">
-        {(search.trim()
-          ? messages.filter((m) => (m.content || '').toLowerCase().includes(search.trim().toLowerCase()))
-          : messages
-        ).map((m, idx, arr) => {
+        {messages
+          .filter((m) => !isExpired(m.expires_at))
+          .filter((m) => !search.trim() || (m.content || '').toLowerCase().includes(search.trim().toLowerCase()))
+          .map((m, idx, arr) => {
           const mine = m.author_id === me.id
           const sticker = m.content?.startsWith('sticker:') ? m.content.slice(8) : null
           const prev = arr[idx - 1]

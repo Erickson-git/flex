@@ -157,6 +157,8 @@ export interface ChatMessage {
   edited_at?: string | null
   /** Supprimé pour tout le monde → affiche « message supprimé ». */
   deleted?: boolean
+  /** Message éphémère : disparaît après cette date. */
+  expires_at?: string | null
   created_at: string
 }
 
