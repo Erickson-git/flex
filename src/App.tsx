@@ -43,6 +43,7 @@ const ArenaMatch = lazy(() => import('@/pages/ArenaMatch'))
 const Premium = lazy(() => import('@/pages/Premium'))
 const Withdraw = lazy(() => import('@/pages/Withdraw'))
 const Invite = lazy(() => import('@/pages/Invite'))
+const Logout = lazy(() => import('@/pages/Logout'))
 const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'))
 const SparkRoom = lazy(() => import('@/pages/SparkRoom'))
 const UserProfile = lazy(() => import('@/pages/UserProfile'))
@@ -221,6 +222,7 @@ export default function App() {
         <Route path="/reset" element={<ResetPassword />} />
         <Route path="/welcome" element={<Protected><Welcome /></Protected>} />
         <Route path="/invite/:code" element={<Invite />} />
+        <Route path="/logout" element={<Logout />} />
 
         {/* Back-office privé — garde admin strict (redirige les non-admins) */}
         <Route path="/flesh-admin-dashboard" element={<AdminOnly><AdminDashboard /></AdminOnly>} />
