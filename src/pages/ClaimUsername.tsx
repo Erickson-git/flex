@@ -43,12 +43,14 @@ export default function ClaimUsername() {
   const meRef = useRef<Profile | null>(null)
   const referrerRef = useRef<string | null>(null)
 
-  // Seuls le PSEUDO et le MOT DE PASSE sont obligatoires. Email + téléphone
-  // sont OPTIONNELS (complétables à tout moment) : valides seulement si remplis.
+  // Seul le PSEUDO est obligatoire. Mot de passe, email et téléphone sont
+  // OPTIONNELS (complétables à tout moment) : valides seulement si remplis.
   const emailOk = !email.trim() || EMAIL_RE.test(email.trim())
   const pwdCheck = checkPassword(pwd)
+  const pwdProvided = pwd.length > 0
   const pwdMatch = pwd === pwd2
-  const pwdOk = pwdCheck.ok && pwdMatch
+  // Mot de passe optionnel : OK s'il est vide, sinon il doit être valide ET confirmé.
+  const pwdOk = !pwdProvided || (pwdCheck.ok && pwdMatch)
   const phoneOk = !phone.trim() || phoneDigits(phone).length >= 8
   const canSubmit = status === 'available' && pwdOk && emailOk && phoneOk && !submitting
 
@@ -91,12 +93,15 @@ export default function ClaimUsername() {
         setMe(updated)
         meRef.current = updated
       }
-      // 3) Mot de passe + email → compte permanent. Si aucun email n'est donné,
-      //    on génère un email interne `pseudo@flex.app` pour permettre la
-      //    connexion par PSEUDO + mot de passe (l'utilisateur ajoutera un vrai
-      //    email plus tard s'il veut la récupération).
-      const authEmail = email.trim() || `${value.trim().toLowerCase()}@flex.app`
-      await secureAccount(authEmail, pwd)
+      // 3) Mot de passe + email → compte permanent (OPTIONNEL). Si l'utilisateur
+      //    n'a pas défini de mot de passe, le compte reste anonyme mais
+      //    fonctionnel : il pourra le sécuriser plus tard depuis son profil.
+      //    Si un mot de passe est donné sans email, on génère un email interne
+      //    `pseudo@flex.app` pour permettre la connexion par PSEUDO + mot de passe.
+      if (pwdProvided) {
+        const authEmail = email.trim() || `${value.trim().toLowerCase()}@flex.app`
+        await secureAccount(authEmail, pwd)
+      }
       navigate('/welcome', { replace: true, state: { referrer: referrerRef.current } })
     } catch (e) {
       // Le compte peut être créé mais la sécurisation a échoué (ex. email déjà
@@ -134,9 +139,8 @@ export default function ClaimUsername() {
           Crée ton <span className="text-gold-grad">compte</span>.
         </h1>
         <p className="mt-2 max-w-sm text-center text-sm text-zinc-400">
-          Seuls un <span className="text-white">pseudo</span> et un{' '}
-          <span className="text-white">mot de passe</span> sont requis. Email et
-          téléphone sont optionnels — à compléter à tout moment.
+          Seul un <span className="text-white">pseudo</span> est requis. Mot de
+          passe, email et téléphone sont optionnels — à compléter à tout moment.
         </p>
       </div>
 
@@ -222,7 +226,7 @@ export default function ClaimUsername() {
               value={pwd}
               onChange={(e) => setPwd(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submit()}
-              placeholder="Définir un mot de passe"
+              placeholder="Mot de passe (optionnel)"
               className="input-luxe pl-12 pr-12"
             />
             <button
@@ -257,21 +261,25 @@ export default function ClaimUsername() {
           )}
         </div>
 
-        {/* Confirmation du mot de passe */}
+        {/* Confirmation du mot de passe — seulement si un mot de passe est défini */}
         <div>
-          <div className="relative">
-            <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-500" />
-            <input
-              type={showPwd ? 'text' : 'password'}
-              value={pwd2}
-              onChange={(e) => setPwd2(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && submit()}
-              placeholder="Confirme le mot de passe"
-              className="input-luxe pl-12"
-            />
-          </div>
+          {pwdProvided && (
+            <div className="relative">
+              <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-500" />
+              <input
+                type={showPwd ? 'text' : 'password'}
+                value={pwd2}
+                onChange={(e) => setPwd2(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && submit()}
+                placeholder="Confirme le mot de passe"
+                className="input-luxe pl-12"
+              />
+            </div>
+          )}
           <div className="mt-2 min-h-[1.1rem] text-sm">
-            {pwd2.length > 0 && !pwdMatch && <span className="text-flex-pink">Les mots de passe diffèrent.</span>}
+            {pwdProvided && pwd2.length > 0 && !pwdMatch && (
+              <span className="text-flex-pink">Les mots de passe diffèrent.</span>
+            )}
             {error && <span className="text-flex-pink">{error}</span>}
           </div>
         </div>
