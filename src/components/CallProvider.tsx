@@ -118,6 +118,16 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
   }, [status])
 
+  // Façon WhatsApp : dès qu'un appel est actif, on coupe toute autre musique/son
+  // de la page (musique de profil, vocaux…) — sauf les éléments de l'appel.
+  useEffect(() => {
+    const active = status === 'incoming' || status === 'outgoing' || status === 'connected'
+    if (!active) return
+    document.querySelectorAll('audio, video').forEach((el) => {
+      if (!el.hasAttribute('data-call')) (el as HTMLMediaElement).pause()
+    })
+  }, [status])
+
   // Boîte de réception d'appels — active tant qu'on est connecté.
   useEffect(() => {
     if (!available || !me) return
@@ -461,6 +471,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
       if (pcRef.current && p.sdp) {
         await pcRef.current.setRemoteDescription(p.sdp)
         await flushIce()
+        // Le destinataire a DÉCROCHÉ → on passe « connecté » immédiatement :
+        // la sonnerie s'arrête tout de suite (comme WhatsApp), sans attendre l'ICE.
+        connectedRef.current = true
+        setStatus('connected')
       }
     } else if (p.kind === 'ice') {
       if (p.candidate) {
@@ -882,9 +896,10 @@ function CallOverlay({
       )}
       {videoConnected ? (
         <>
-          <video ref={remoteVideo} autoPlay playsInline muted className="absolute inset-0 h-full w-full bg-black object-cover" />
+          <video ref={remoteVideo} data-call autoPlay playsInline muted className="absolute inset-0 h-full w-full bg-black object-cover" />
           <video
             ref={localVideo}
+            data-call
             autoPlay
             playsInline
             muted
@@ -907,7 +922,7 @@ function CallOverlay({
       {/* Audio distant TOUJOURS monté (appels audio ET vidéo) → son fiable,
           jamais coupé par le changement d'état/branche. La vidéo distante est
           muette : tout le son sort d'ici. */}
-      <audio ref={remoteAudio} autoPlay playsInline />
+      <audio ref={remoteAudio} data-call autoPlay playsInline />
 
       <div className="relative z-10 mt-auto flex items-center justify-center gap-8 pb-14 pt-6">
         {status === 'incoming' ? (
