@@ -15,6 +15,8 @@ import {
   type RoomMember,
   type SearchResult,
 } from '@/lib/groupCall'
+import { notifyUser } from '@/lib/push'
+import { recordNotification } from '@/lib/notifications'
 import { Avatar } from '@/components/Avatar'
 import { cn, haptic } from '@/lib/utils'
 
@@ -486,6 +488,18 @@ function AddSheet({ roomId, existing, onClose }: { roomId: string; existing: str
     setBusy(true)
     try {
       await inviteMember(roomId, r.id)
+      // Prévenir l'invité pour qu'il rejoigne l'appel en cours (notif + push).
+      const me = useAuth.getState().me
+      if (me) {
+        const link = `/app/call/${roomId}`
+        notifyUser(r.id, `${me.display_name} t'invite à un appel`, 'Appuie pour rejoindre', link, 'callinvite:' + roomId)
+        recordNotification(r.id, 'call', 'Invitation à un appel', `${me.display_name} t'invite à un appel de groupe`, {
+          image: me.avatar_url,
+          link,
+          actorId: me.id,
+          actorName: me.display_name,
+        })
+      }
       setAdded((a) => [...a, r.id])
       haptic([10, 20, 10])
     } catch {

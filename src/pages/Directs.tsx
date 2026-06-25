@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Archive, BellOff, Loader2, Pin, Plus, Search, X } from 'lucide-react'
+import { Archive, BellOff, Loader2, Phone, Pin, Plus, Search, Video, X } from 'lucide-react'
 import type { DirectThread, Profile } from '@/lib/types'
 import { fetchThreads, subscribeThreads, unreadCount } from '@/lib/api'
 import { onPresence } from '@/lib/globalPresence'
-import { searchProfiles, type SearchResult } from '@/lib/groupCall'
+import { createCallRoom, searchProfiles, type SearchResult } from '@/lib/groupCall'
 import { fetchActiveStories, groupStories, type Story } from '@/lib/stories'
 import { isArchived, isMuted, isPinned, toggleArchive, toggleMute, togglePin } from '@/lib/chatPrefs'
 import { useAuth } from '@/store/useAuth'
@@ -133,12 +133,42 @@ export default function Directs() {
 
   const searching = q.trim().length >= 2
 
+  // Démarre un appel de GROUPE (on invite ensuite des participants dans la salle).
+  async function startGroupCall(kind: 'audio' | 'video') {
+    haptic(12)
+    try {
+      const id = await createCallRoom(kind)
+      if (id) navigate(`/app/call/${id}`)
+    } catch {
+      /* indisponible */
+    }
+  }
+
   return (
     <div className="mx-auto max-w-lg pb-28">
       <header className="safe-top sticky top-0 z-30 bg-ink-900/85 px-5 pb-2 pt-2 backdrop-blur-xl">
-        <h1 className="font-display text-3xl font-extrabold">
-          <span className="text-gold-grad">Chat</span>
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="font-display text-3xl font-extrabold">
+            <span className="text-gold-grad">Chat</span>
+          </h1>
+          {/* Appel de GROUPE (audio / vidéo) — on ajoute des participants dans la salle */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => startGroupCall('audio')}
+              aria-label="Nouvel appel de groupe audio"
+              className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-zinc-200 active:scale-90"
+            >
+              <Phone className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => startGroupCall('video')}
+              aria-label="Nouvel appel de groupe vidéo"
+              className="grid h-10 w-10 place-items-center rounded-full border border-flex-cyan/30 bg-flex-cyan/[0.06] text-flex-cyan active:scale-90"
+            >
+              <Video className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
         <div className="mt-2 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4">
           <Search className="h-5 w-5 text-zinc-500" />
           <input
