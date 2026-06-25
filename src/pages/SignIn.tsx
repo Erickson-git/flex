@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { ChevronLeft, Eye, EyeOff, Loader2, ScanFace } from 'lucide-react'
 import { signInWithEmail } from '@/lib/account'
 import { takeRedirect } from '@/lib/redirect'
+import { lockRemaining, recordLoginFailure, recordLoginSuccess } from '@/lib/loginGuard'
 import { biometricEnabled, biometricSupported, getFaceAccount, verifyBiometric } from '@/lib/biometric'
 import { useAuth } from '@/store/useAuth'
 import { BrandLogo } from '@/components/BrandLogo'
@@ -57,6 +58,12 @@ export default function SignIn() {
 
   async function submit() {
     if (!canSubmit) return
+    // Anti-bruteforce : si verrouillé après trop d'échecs, on bloque la tentative.
+    const wait = lockRemaining()
+    if (wait > 0) {
+      setErr(`Trop de tentatives. Réessaie dans ${wait}s.`)
+      return
+    }
     setBusy(true)
     setErr(null)
     haptic([10, 30, 10])
@@ -64,10 +71,14 @@ export default function SignIn() {
       const id = ident.trim()
       const email = id.includes('@') ? id : `${id.toLowerCase()}@flex.app`
       await signInWithEmail(email, pwd)
+      recordLoginSuccess()
       await bootstrap()
       navigate(takeRedirect() ?? '/app', { replace: true })
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Identifiants incorrects.')
+    } catch {
+      // Message GÉNÉRIQUE (anti-énumération : ne révèle pas si le pseudo existe).
+      recordLoginFailure()
+      const left = lockRemaining()
+      setErr(left > 0 ? `Trop de tentatives. Réessaie dans ${left}s.` : 'Identifiants incorrects.')
       setBusy(false)
     }
   }

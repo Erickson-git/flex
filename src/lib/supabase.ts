@@ -23,6 +23,13 @@ export const DEMO_MODE =
 export const supabase: SupabaseClient | null =
   !DEMO_MODE && url && anon
     ? createClient(url, anon, {
-        auth: { persistSession: true, autoRefreshToken: true },
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          // PKCE : échange de code d'autorisation sécurisé (recommandé pour les
+          // apps navigateur) + requis pour les liens email (récupération mdp).
+          flowType: 'pkce',
+          detectSessionInUrl: true,
+        },
       })
     : null
