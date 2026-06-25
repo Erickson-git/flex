@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Archive, BellOff, Loader2, Phone, Pin, Plus, Search, Video, X } from 'lucide-react'
+import { Archive, BellOff, History, Loader2, Phone, Pin, Plus, Search, Video, X } from 'lucide-react'
 import type { DirectThread, Profile } from '@/lib/types'
 import { fetchThreads, subscribeThreads, unreadCount } from '@/lib/api'
 import { onPresence } from '@/lib/globalPresence'
@@ -151,8 +151,15 @@ export default function Directs() {
           <h1 className="font-display text-3xl font-extrabold">
             <span className="text-gold-grad">Chat</span>
           </h1>
-          {/* Appel de GROUPE (audio / vidéo) — on ajoute des participants dans la salle */}
+          {/* Historique des appels + Appel de GROUPE (audio / vidéo) */}
           <div className="flex items-center gap-1">
+            <button
+              onClick={() => { haptic(8); navigate('/app/calls') }}
+              aria-label="Historique des appels"
+              className="grid h-10 w-10 place-items-center rounded-full text-zinc-300 active:scale-90"
+            >
+              <History className="h-5 w-5" />
+            </button>
             <button
               onClick={() => startGroupCall('audio')}
               aria-label="Nouvel appel de groupe audio"
