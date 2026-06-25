@@ -15,9 +15,9 @@ export default defineConfig({
             registerType: 'autoUpdate',
             includeAssets: ['favicon.svg', 'logo.jpg', 'icons/*.jpg'],
             manifest: {
-                name: 'FLEX — Freedom · Party · Show-biz',
+                name: 'FLEX',
                 short_name: 'FLEX',
-                description: 'Le réseau social du Flex. Brille en public, libère-toi en privé.',
+                description: 'Le réseau social du Flex. Les 100 premiers deviennent Pionniers.',
                 theme_color: '#050505',
                 background_color: '#050505',
                 display: 'standalone',

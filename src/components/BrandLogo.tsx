@@ -66,8 +66,7 @@ export function BrandLogo({
           animate={animate ? { opacity: 1 } : false}
           transition={{ delay: animate ? 0.7 : 0, duration: 0.8 }}
         >
-          Freedom <span className="text-zinc-700">·</span> Party{' '}
-          <span className="text-zinc-700">·</span> Show-biz
+          Les 100 premiers deviennent Pionniers
         </motion.div>
       )}
     </div>

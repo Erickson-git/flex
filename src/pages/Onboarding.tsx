@@ -35,18 +35,7 @@ export default function Onboarding() {
 
       <div className="relative flex flex-1 flex-col items-center justify-center text-center">
         {/* Logo animé : l'accueil est l'écran de lancement de l'app. */}
-        <BrandLogo size={200} animate />
-
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.7 }}
-          className="mt-7 max-w-xs text-lg leading-relaxed text-zinc-300"
-        >
-          Brille en public.
-          <br />
-          <span className="text-zinc-500">Libère-toi en privé.</span>
-        </motion.p>
+        <BrandLogo size={200} baseline={false} animate />
 
         <motion.div
           initial={{ opacity: 0 }}
