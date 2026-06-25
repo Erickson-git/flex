@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ChevronRight, Crown, Gift, Lock, LogOut, Music2, Pencil, Phone, Settings, ShieldCheck, Share2, Sparkles, Users, type LucideIcon } from 'lucide-react'
+import { Banknote, ChevronRight, Crown, Gift, Lock, LogOut, Music2, Pencil, Phone, Settings, ShieldCheck, Share2, Sparkles, Users, type LucideIcon } from 'lucide-react'
 import { createCallRoom } from '@/lib/groupCall'
 import { useAuth } from '@/store/useAuth'
 import { Avatar } from '@/components/Avatar'
@@ -166,6 +166,14 @@ export default function Profile() {
             <Crown className="h-4 w-4" /> Recharger
           </button>
         </div>
+
+        {/* Économie créateur : convertir ses Sparks en argent réel */}
+        <button
+          onClick={() => navigate('/app/withdraw')}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-400/5 py-3 text-sm font-bold text-emerald-300 active:scale-95"
+        >
+          <Banknote className="h-4 w-4" /> Retirer mes Sparks (FCFA)
+        </button>
 
         {/* ── Menu organisé par sections ──────────────────────── */}
         <MenuSection title="Mon univers" />

@@ -40,6 +40,7 @@ const Market = lazy(() => import('@/pages/Market'))
 const ArenaLobby = lazy(() => import('@/pages/ArenaLobby'))
 const ArenaMatch = lazy(() => import('@/pages/ArenaMatch'))
 const Premium = lazy(() => import('@/pages/Premium'))
+const Withdraw = lazy(() => import('@/pages/Withdraw'))
 const Invite = lazy(() => import('@/pages/Invite'))
 const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'))
 const SparkRoom = lazy(() => import('@/pages/SparkRoom'))
@@ -223,6 +224,7 @@ export default function App() {
         <Route path="/app/directs/:id" element={<Protected><DirectThread /></Protected>} />
         <Route path="/app/market" element={<Protected><Market /></Protected>} />
         <Route path="/app/premium" element={<Protected><Premium /></Protected>} />
+        <Route path="/app/withdraw" element={<Protected><Withdraw /></Protected>} />
         <Route path="/app/arena/:id" element={<Protected><ArenaMatch /></Protected>} />
         <Route path="/app/spark/:id" element={<Protected><SparkRoom /></Protected>} />
         <Route path="/app/u/:username" element={<Protected><UserProfile /></Protected>} />
