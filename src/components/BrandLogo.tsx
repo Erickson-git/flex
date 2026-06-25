@@ -11,11 +11,11 @@ import { cn } from '@/lib/utils'
  */
 export function BrandLogo({
   size = 160,
-  baseline = true,
   animate = false,
   className,
 }: {
   size?: number
+  /** Conservé pour compatibilité des appels existants ; plus de texte sous le logo. */
   baseline?: boolean
   animate?: boolean
   className?: string
@@ -58,17 +58,6 @@ export function BrandLogo({
           />
         )}
       </motion.div>
-
-      {baseline && (
-        <motion.div
-          className="mt-4 text-[0.6rem] font-semibold uppercase tracking-[0.4em] text-zinc-500"
-          initial={animate ? { opacity: 0 } : false}
-          animate={animate ? { opacity: 1 } : false}
-          transition={{ delay: animate ? 0.7 : 0, duration: 0.8 }}
-        >
-          Les 100 premiers deviennent Pionniers
-        </motion.div>
-      )}
     </div>
   )
 }

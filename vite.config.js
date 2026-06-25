@@ -17,7 +17,7 @@ export default defineConfig({
             manifest: {
                 name: 'FLEX',
                 short_name: 'FLEX',
-                description: 'Le réseau social du Flex. Les 100 premiers deviennent Pionniers.',
+                description: 'Le réseau social du Flex.',
                 theme_color: '#050505',
                 background_color: '#050505',
                 display: 'standalone',
