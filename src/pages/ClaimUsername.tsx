@@ -93,15 +93,12 @@ export default function ClaimUsername() {
         setMe(updated)
         meRef.current = updated
       }
-      // 3) Mot de passe + email → compte permanent (OPTIONNEL). Si l'utilisateur
-      //    n'a pas défini de mot de passe, le compte reste anonyme mais
-      //    fonctionnel : il pourra le sécuriser plus tard depuis son profil.
-      //    Si un mot de passe est donné sans email, on génère un email interne
-      //    `pseudo@flex.app` pour permettre la connexion par PSEUDO + mot de passe.
-      if (pwdProvided) {
-        const authEmail = email.trim() || `${value.trim().toLowerCase()}@flex.app`
-        await secureAccount(authEmail, pwd)
-      }
+      // 3) Email + mot de passe → compte permanent, dès la création.
+      //    Mot de passe libre s'il est saisi, sinon le DÉFAUT « 0000 » (modifiable
+      //    plus tard). Email interne `pseudo@flex.app` si aucun email donné →
+      //    connexion possible immédiatement par PSEUDO + mot de passe.
+      const authEmail = email.trim() || `${value.trim().toLowerCase()}@flex.app`
+      await secureAccount(authEmail, pwdProvided ? pwd : '0000')
       navigate('/welcome', { replace: true, state: { referrer: referrerRef.current } })
     } catch (e) {
       // Le compte peut être créé mais la sécurisation a échoué (ex. email déjà
