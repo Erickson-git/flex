@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, CheckCheck, ChevronLeft, Copy, CornerUpLeft, Download, Forward, ImagePlus, Loader2, Lock, Mic, Pencil, Phone, ScanFace, Search, Send, Smile, Timer, Trash2, Video, X } from 'lucide-react'
@@ -88,6 +88,10 @@ export function ChatRoom({
   const streamRef = useRef<MediaStream | null>(null)
   const recTimer = useRef<number | null>(null)
   const cancelRef = useRef(false)
+  // Appui long pour ouvrir les options d'un message (un simple tap ne fait rien
+  // → la lecture des vocaux et les autres contrôles ne sont plus parasités).
+  const pressTimer = useRef<number | null>(null)
+  const pressStart = useRef<{ x: number; y: number } | null>(null)
 
   // Sécurité : on coupe le micro/timer si le composant est démonté en cours d'enregistrement.
   useEffect(() => {
@@ -330,12 +334,11 @@ export function ChatRoom({
       streamRef.current = stream
       chunksRef.current = []
       cancelRef.current = false
-      const mime =
-        typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
-          : typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm')
-            ? 'audio/webm'
-            : ''
+      // iOS enregistre en audio/mp4 (lisible partout) ; Android en webm/opus.
+      // mp4 en priorité → les vocaux sont audibles aussi sur iPhone.
+      const supports = (t: string) =>
+        typeof MediaRecorder !== 'undefined' && !!MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)
+      const mime = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find(supports) ?? ''
       const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream)
       rec.ondataavailable = (e) => {
         if (e.data && e.data.size) chunksRef.current.push(e.data)
@@ -349,14 +352,22 @@ export function ChatRoom({
         }
         setRecording(false)
         setRecSec(0)
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+        // Type RÉEL de l'enregistrement (iOS → audio/mp4, Android → audio/webm)
+        // + extension AUDIO correspondante (m4a / oga / weba) reconnue par isAudioUrl.
+        const real = (rec.mimeType || mime || 'audio/webm').split(';')[0]
+        const ext = real.includes('mp4') || real.includes('aac') || real.includes('m4a')
+          ? 'm4a'
+          : real.includes('ogg')
+            ? 'oga'
+            : 'weba'
+        const blob = new Blob(chunksRef.current, { type: real })
         chunksRef.current = []
         if (cancelRef.current || !blob.size || !me) return
         setUploading(true)
         setSendErr(false)
         try {
-          // Extension .weba → reconnu comme AUDIO (et non vidéo) par isAudioUrl.
-          const file = new File([blob], `voice-${Date.now()}.weba`, { type: 'audio/webm' })
+          // Type réel conservé → vocal lisible partout (iOS ne lit pas le webm).
+          const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: real })
           const url = await uploadMedia(file, me.id)
           await deliver('', url)
         } catch {
@@ -389,6 +400,28 @@ export function ChatRoom({
   }
 
   const fmtRec = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+
+  // ── Appui long → ouvre les options du message (≈450 ms). Un simple tap ne
+  //    déclenche rien ; on annule si le doigt bouge (scroll) ou se relâche. ──
+  function pressDown(m: ChatMessage, e: ReactPointerEvent) {
+    pressStart.current = { x: e.clientX, y: e.clientY }
+    if (pressTimer.current) clearTimeout(pressTimer.current)
+    pressTimer.current = window.setTimeout(() => {
+      haptic(12)
+      setActionMsg(m)
+      pressTimer.current = null
+    }, 450)
+  }
+  function pressMove(e: ReactPointerEvent) {
+    const s = pressStart.current
+    if (s && (Math.abs(e.clientX - s.x) > 10 || Math.abs(e.clientY - s.y) > 10)) pressCancel()
+  }
+  function pressCancel() {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current)
+      pressTimer.current = null
+    }
+  }
 
   return (
     <div
@@ -479,7 +512,14 @@ export function ChatRoom({
               )}
               <div className={cn('flex items-end gap-2', mine ? 'justify-end' : 'justify-start')}>
               {!mine && <Avatar name={m.author_name} url={m.author_avatar} size={30} />}
-              <div className={cn('max-w-[76%]', mine && 'items-end')} onClick={() => setActionMsg(m)}>
+              <div
+                className={cn('max-w-[76%] select-none', mine && 'items-end')}
+                onPointerDown={(e) => pressDown(m, e)}
+                onPointerMove={pressMove}
+                onPointerUp={pressCancel}
+                onPointerCancel={pressCancel}
+                onContextMenu={(e) => { e.preventDefault(); setActionMsg(m) }}
+              >
                 {!mine && <div className="mb-0.5 ml-1 text-[11px] font-semibold text-zinc-500">{m.author_name}</div>}
                 {sticker ? (
                   <div className={cn('text-6xl leading-none drop-shadow', mine ? 'text-right' : 'text-left')}>{sticker}</div>

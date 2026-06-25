@@ -6,6 +6,7 @@ import { notifyUser } from '@/lib/push'
 import { ringtoneUrl } from '@/lib/audioLibrary'
 import { recordNotification } from '@/lib/notifications'
 import { recordCall } from '@/lib/calls'
+import { RTC_CONFIG } from '@/lib/rtc'
 import { uploadMedia } from '@/lib/upload'
 import { saveToGallery } from '@/lib/gallery'
 import { useAuth } from '@/store/useAuth'
@@ -49,31 +50,7 @@ interface CallContext {
 const Ctx = createContext<CallContext>({ startCall: () => {}, available: false })
 export const useCall = () => useContext(Ctx)
 
-const RTC_CONFIG: RTCConfiguration = {
-  iceServers: [
-    {
-      urls: [
-        'stun:stun.l.google.com:19302',
-        'stun:stun1.l.google.com:19302',
-        'stun:stun2.l.google.com:19302',
-        'stun:stun.cloudflare.com:3478',
-      ],
-    },
-    // Relais TURN gratuit (Metered Open Relay) — indispensable sur réseaux
-    // mobiles / NAT strict où le P2P direct échoue. UDP + TCP + TLS.
-    {
-      urls: [
-        'turn:openrelay.metered.ca:80',
-        'turn:openrelay.metered.ca:443',
-        'turn:openrelay.metered.ca:443?transport=tcp',
-        'turns:openrelay.metered.ca:443?transport=tcp',
-      ],
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-  ],
-  iceCandidatePoolSize: 10,
-}
+// Config ICE centralisée (STUN + TURN pilotable par env) : voir src/lib/rtc.ts.
 
 const fmtDur = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
