@@ -35,9 +35,10 @@
 - Multi-plateforme : PC, Android, iOS.
 - Astuce iOS : tutoriel « Ajouter à l'écran d'accueil » (PWA) en attendant l'App Store.
 
-## 7. Fact-Checking & Modération
-- **Détective-FLEX** : IA de vérification des faits, badges (Vérifié / En cours / Douteux).
-- Validation humaine : dashboard admin pour certifier ou corriger l'IA.
+## 7. Fact-Checking & Modération (sans IA)
+- Badges de fiabilité (Vérifié / En cours / Douteux) attribués **manuellement**.
+- Validation humaine : dashboard admin pour certifier les informations.
+- _(Note : l'IA a été retirée de FLEX — plus de composant « Mon IA » ni de Détective-FLEX automatique.)_
 
 ---
 
@@ -67,7 +68,6 @@
 2. **Flex-Pulse** (fil débats type X) — variante du feed actuel.
 3. **Flex-Connect** (roulette/speed-networking) — WebRTC requis.
 4. **Flex-Meet** (partage d'écran) — WebRTC.
-5. **Détective-FLEX** (fact-checking IA + badges).
-6. **Flex-Academy / Flex-Book** (cours, RDV, Google Calendar).
-7. **Flex-Shop Builder** (templates de sites par métier).
-8. **Flex-Wallet** (Bitcoin non-custodial) — le plus lourd (sécurité/réglementaire).
+5. **Flex-Academy / Flex-Book** (cours, RDV, Google Calendar).
+6. **Flex-Shop Builder** (templates de sites par métier).
+7. **Flex-Wallet** (Bitcoin non-custodial) — le plus lourd (sécurité/réglementaire).

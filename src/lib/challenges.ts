@@ -34,7 +34,6 @@ export interface Unlock {
 export const REWARD_FEATURES: { key: string; label: string }[] = [
   { key: 'vip', label: '👑 Statut VIP' },
   { key: 'premium_filters', label: '✨ Filtres premium' },
-  { key: 'ai_unlimited', label: '🤖 Chat IA illimité' },
   { key: 'exclusive_themes', label: '🎨 Thèmes exclusifs' },
   { key: 'spotlight', label: '🔦 Coup de projecteur' },
 ]

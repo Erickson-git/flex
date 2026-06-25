@@ -8,7 +8,6 @@ import { PioneerBadge } from '@/components/PioneerBadge'
 import { PrestigeBadge } from '@/components/PrestigeBadge'
 import { SparksChip } from '@/components/SparksChip'
 import { ShadowVisitors } from '@/components/ShadowVisitors'
-import { AiCompanion } from '@/components/AiCompanion'
 import { PremiumBadge } from '@/components/PremiumBadge'
 import { SecureAccountCard } from '@/components/SecureAccountCard'
 import { ProfileFlexHistory } from '@/components/ProfileFlexHistory'
@@ -135,9 +134,6 @@ export default function Profile() {
             </div>
           ))}
         </div>
-
-        {/* Mon IA — agent autoclonable, évolue avec l'activité */}
-        <AiCompanion />
 
         {/* Historique de mes Flex — modifier / verrouiller / supprimer */}
         <ProfileFlexHistory userId={me.id} isOwner />
