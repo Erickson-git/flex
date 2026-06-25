@@ -7,8 +7,9 @@ import { useAuth } from '@/store/useAuth'
 
 /**
  * Atterrissage d'un lien d'invitation (flesh.app/invite/<pseudo>).
- * On mémorise le parrain puis on dirige vers la revendication de pseudo
- * (ou directement dans l'app si déjà connecté).
+ * On mémorise le parrain (bonus conservé), puis on dirige vers la PAGE DE
+ * CONNEXION (accueil, 3 options) si non connecté — jamais d'accès direct qui
+ * sauterait l'authentification — ou directement dans l'app si déjà connecté.
  */
 export default function Invite() {
   const { code = '' } = useParams()
@@ -18,7 +19,7 @@ export default function Invite() {
   useEffect(() => {
     if (code) captureReferral(code)
     if (loading) return
-    const t = setTimeout(() => navigate(me ? '/app' : '/claim', { replace: true }), 1600)
+    const t = setTimeout(() => navigate(me ? '/app' : '/', { replace: true }), 1600)
     return () => clearTimeout(t)
   }, [code, me, loading, navigate])
 

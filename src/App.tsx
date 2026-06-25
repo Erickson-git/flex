@@ -219,7 +219,7 @@ export default function App() {
         <Route path="/forgot" element={<PublicOnly><ForgotPassword /></PublicOnly>} />
         {/* Réinitialisation depuis le lien email : accessible même avec une session de récupération */}
         <Route path="/reset" element={<ResetPassword />} />
-        <Route path="/welcome" element={<Welcome />} />
+        <Route path="/welcome" element={<Protected><Welcome /></Protected>} />
         <Route path="/invite/:code" element={<Invite />} />
 
         {/* Back-office privé — garde admin strict (redirige les non-admins) */}
