@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Archive, BellOff, Loader2, Pin, Plus, Search, X } from 'lucide-react'
 import type { DirectThread, Profile } from '@/lib/types'
-import { fetchThreads, subscribeThreads } from '@/lib/api'
+import { fetchThreads, subscribeThreads, unreadCount } from '@/lib/api'
+import { onPresence } from '@/lib/globalPresence'
 import { searchProfiles, type SearchResult } from '@/lib/groupCall'
 import { fetchActiveStories, groupStories, type Story } from '@/lib/stories'
 import { isArchived, isMuted, isPinned, toggleArchive, toggleMute, togglePin } from '@/lib/chatPrefs'
@@ -58,6 +59,9 @@ export default function Directs() {
     if (pressTimer.current) clearTimeout(pressTimer.current)
   }
 
+  const [online, setOnline] = useState<Set<string>>(new Set())
+  const [counts, setCounts] = useState<Record<string, number>>({})
+
   useEffect(() => {
     const load = () => fetchThreads().then(setThreads).catch(() => {})
     load().finally(() => setLoading(false))
@@ -65,6 +69,34 @@ export default function Directs() {
     const unsub = subscribeThreads(load) // mise à jour temps réel de la liste
     return unsub
   }, [])
+
+  // Présence en ligne (point vert).
+  useEffect(() => onPresence(setOnline), [])
+
+  // Nombre de messages non lus par conversation (façon WhatsApp).
+  useEffect(() => {
+    if (!me) return
+    const r = lastReadMap()
+    const unreadThreads = threads.filter(
+      (t) => t.last_sender && t.last_sender !== me.id && new Date(t.last_at).getTime() > (r[t.id] || 0),
+    )
+    if (!unreadThreads.length) {
+      setCounts({})
+      return
+    }
+    let cancelled = false
+    Promise.all(
+      unreadThreads.map(async (t) => {
+        const n = await unreadCount(t.id, new Date(r[t.id] || 0).toISOString(), me.id).catch(() => 0)
+        return [t.id, n] as const
+      }),
+    ).then((pairs) => {
+      if (!cancelled) setCounts(Object.fromEntries(pairs))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [threads, me?.id])
 
   const reads = lastReadMap()
 
@@ -207,7 +239,12 @@ export default function Directs() {
                     }}
                     className="flex w-full items-center gap-3 rounded-2xl px-2 py-3 text-left active:bg-white/5"
                   >
-                    <Avatar name={t.peer.display_name} url={t.peer.avatar_url} size={54} ring={unread} />
+                    <div className="relative shrink-0">
+                      <Avatar name={t.peer.display_name} url={t.peer.avatar_url} size={54} ring={unread} />
+                      {online.has(t.peer.id) && (
+                        <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-ink-900 bg-emerald-500" />
+                      )}
+                    </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         {isPinned(t.id) && <Pin className="h-3.5 w-3.5 shrink-0 text-gold" />}
@@ -217,8 +254,16 @@ export default function Directs() {
                       <div className={cn('truncate text-sm', unread ? 'font-semibold text-zinc-200' : 'text-zinc-400')}>{preview}</div>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="text-[11px] text-zinc-600">{timeAgo(t.last_at)}</span>
-                      {unread && !isMuted(t.id) && <span className="h-2.5 w-2.5 rounded-full bg-flex-pink" />}
+                      <span className={cn('text-[11px]', unread ? 'font-semibold text-emerald-400' : 'text-zinc-600')}>{timeAgo(t.last_at)}</span>
+                      {unread && !isMuted(t.id) && (
+                        counts[t.id] ? (
+                          <span className="grid h-5 min-w-[1.25rem] place-items-center rounded-full bg-emerald-500 px-1.5 text-[11px] font-bold text-ink-900">
+                            {counts[t.id] > 99 ? '99+' : counts[t.id]}
+                          </span>
+                        ) : (
+                          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                        )
+                      )}
                     </div>
                   </motion.button>
                 )

@@ -484,6 +484,21 @@ export async function fetchRoomMessages(roomId: string, me: Profile): Promise<Ch
   return (data ?? []) as ChatMessage[]
 }
 
+/**
+ * Nombre de messages NON LUS d'un salon : messages reçus (pas de moi) postés
+ * après la date `sinceIso` (dernière ouverture de la conversation).
+ */
+export async function unreadCount(roomId: string, sinceIso: string, meId: string): Promise<number> {
+  if (DEMO_MODE || !supabase) return 0
+  const { count } = await supabase
+    .from('chat_messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('room_id', roomId)
+    .neq('author_id', meId)
+    .gt('created_at', sinceIso)
+  return count ?? 0
+}
+
 export async function sendRoomMessage(
   roomId: string,
   content: string,

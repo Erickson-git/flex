@@ -21,6 +21,7 @@ import { OfflineBanner } from '@/components/OfflineBanner'
 import { BrandLogo } from '@/components/BrandLogo'
 import { isAdmin } from '@/lib/premium'
 import { rememberRedirect } from '@/lib/redirect'
+import { startGlobalPresence, stopGlobalPresence } from '@/lib/globalPresence'
 
 // Code-splitting : chaque page = un chunk chargé à la demande.
 const Onboarding = lazy(() => import('@/pages/Onboarding'))
@@ -133,6 +134,14 @@ export default function App() {
   useEffect(() => {
     markFeatureSeenByLink(location.pathname)
   }, [location.pathname])
+
+  // Présence EN LIGNE globale (façon WhatsApp) : on se signale tant qu'on est
+  // connecté, et on coupe à la déconnexion.
+  useEffect(() => {
+    if (!me) return
+    startGlobalPresence(me.id)
+    return () => stopGlobalPresence()
+  }, [me?.id])
 
   // Son de notification (~1 s) quand un push arrive et que l'app est ouverte.
   useEffect(() => {
