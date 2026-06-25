@@ -1,6 +1,7 @@
 import { DEMO_MODE, supabase } from './supabase'
 import { DEMO_SHOP, DEMO_TEUFS } from './demoData'
 import type { Profile, ShopItem, Squad, SparkResult } from './types'
+import { ensureCanInteract } from './guard'
 import { uid } from './utils'
 
 // ─────────────────────────────────────────────────────────────
@@ -35,6 +36,7 @@ export function sparkRoomId(a: string, b: string): string {
  * En démo, la star "spark en retour" pour offrir l'effet de match immédiat.
  */
 export async function sparkProfile(me: Profile, target: Profile): Promise<SparkResult> {
+  ensureCanInteract()
   const sent = read<string[]>('flex.sparks.sent', [])
   if (!sent.includes(target.id)) write('flex.sparks.sent', [...sent, target.id])
 
@@ -75,6 +77,7 @@ export function getTeufs(): Squad[] {
 }
 
 export function createTeuf(input: Omit<Squad, 'id' | 'members_count' | 'kind'>): Squad {
+  ensureCanInteract()
   const teuf: Squad = { ...input, id: 'tf_' + uid(), members_count: 1, kind: 'teuf' }
   write('flex.teufs', [teuf, ...read<Squad[]>('flex.teufs', [])])
   return teuf
@@ -88,6 +91,7 @@ export function getShopItems(sellerId?: string): ShopItem[] {
 }
 
 export function addShopItem(item: Omit<ShopItem, 'id'>): ShopItem {
+  ensureCanInteract()
   const it: ShopItem = { ...item, id: 'it_' + uid() }
   write('flex.shop', [it, ...read<ShopItem[]>('flex.shop', [])])
   return it

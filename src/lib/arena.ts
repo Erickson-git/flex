@@ -2,6 +2,7 @@ import { DEMO_MODE, supabase } from './supabase'
 import type { ArenaMatch, ArenaPlayer, Profile } from './types'
 import { DEMO_PROFILES } from './demoData'
 import { applyArenaDelta } from './economy'
+import { ensureCanInteract } from './guard'
 import { uid } from './utils'
 
 // ─────────────────────────────────────────────────────────────
@@ -46,6 +47,7 @@ export function featuredMatches(): ArenaMatch[] {
 
 /** Crée un duel express : moi (a) contre une star aléatoire (b). */
 export async function createQuickMatch(me: Profile, stake: number): Promise<ArenaMatch> {
+  ensureCanInteract()
   const opponent = stars[(me.username.length + stake) % stars.length] ?? DEMO_PROFILES[0]
   const match: ArenaMatch = {
     id: 'm_' + uid(),
@@ -89,6 +91,7 @@ export function getMatch(id: string): ArenaMatch | null {
 
 /** Pari communautaire (escrow immédiat de la mise). */
 export async function placeBet(matchId: string, side: 'a' | 'b', amount: number, me: Profile): Promise<void> {
+  ensureCanInteract()
   if (DEMO_MODE) {
     await applyArenaDelta(me.id, -amount) // débit immédiat (mise en jeu)
     try {
@@ -123,6 +126,7 @@ export async function settleBet(matchId: string, winnerSide: 'a' | 'b', me: Prof
  * Renvoie le delta appliqué au joueur courant.
  */
 export async function settleDuel(match: ArenaMatch, aTaps: number, bTaps: number, me: Profile): Promise<number> {
+  ensureCanInteract()
   const meWon = aTaps >= bTaps // le joueur courant est toujours "a"
   const delta = meWon ? match.stake : -match.stake
   if (DEMO_MODE) {

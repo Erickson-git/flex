@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { ensureCanInteract } from './guard'
 
 export interface Comment {
   id: string
@@ -21,6 +22,7 @@ export async function fetchComments(flexId: string): Promise<Comment[]> {
 }
 
 export async function addComment(flexId: string, content: string, userId: string): Promise<Comment> {
+  ensureCanInteract()
   if (!supabase) throw new Error('Backend indisponible')
   const { data, error } = await supabase
     .from('comments')

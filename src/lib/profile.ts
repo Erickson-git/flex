@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import type { Profile } from './types'
+import { ensureCanInteract } from './guard'
 
 // Édition du profil de l'utilisateur courant (RLS : profiles_update_self).
 export async function updateMyProfile(
@@ -13,6 +14,7 @@ export async function updateMyProfile(
     is_private?: boolean
   },
 ): Promise<Profile> {
+  ensureCanInteract()
   if (!supabase) throw new Error('Backend indisponible')
   const { data, error } = await supabase.from('profiles').update(updates).eq('id', userId).select('*').single()
   if (error) throw error

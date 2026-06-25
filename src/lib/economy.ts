@@ -1,5 +1,6 @@
 import { DEMO_MODE, supabase } from './supabase'
 import type { MarketListing, ProfileView, Wallet } from './types'
+import { ensureCanInteract } from './guard'
 import { uid } from './utils'
 
 // ─────────────────────────────────────────────────────────────
@@ -79,6 +80,7 @@ export async function applyArenaDelta(userId: string, delta: number): Promise<Wa
 
 /** Dépense atomique de Sparks (achat de titre/thème otaku, etc.). */
 export async function spendSparks(userId: string, amount: number, reason: string): Promise<Wallet> {
+  ensureCanInteract()
   if (amount <= 0) throw new Error('Montant invalide')
   if (DEMO_MODE) {
     const w = demoWallet(userId)
@@ -101,6 +103,7 @@ export function touchActive() {
 
 // ── Check-in quotidien (streak) ─────────────────────────────────
 export async function dailyCheckin(userId: string): Promise<{ streak: number; reward: number; wallet: Wallet }> {
+  ensureCanInteract()
   if (DEMO_MODE) {
     const w = demoWallet(userId)
     if (w.last_checkin === todayISO()) throw new Error('Déjà validé aujourd’hui')
@@ -126,6 +129,7 @@ export async function dailyCheckin(userId: string): Promise<{ streak: number; re
 
 // ── Transfert P2P atomique ──────────────────────────────────────
 export async function transferSparks(fromId: string, toId: string, amount: number): Promise<Wallet> {
+  ensureCanInteract()
   if (amount <= 0) throw new Error('Montant invalide')
   if (fromId === toId) throw new Error('Transfert vers soi-même interdit')
   if (DEMO_MODE) {
@@ -174,6 +178,7 @@ export async function fetchListings(): Promise<MarketListing[]> {
 }
 
 export async function listBadge(userId: string, userName: string, badge: string, price: number): Promise<MarketListing> {
+  ensureCanInteract()
   if (price <= 0) throw new Error('Prix invalide')
   if (DEMO_MODE) {
     const badges = read<string[]>(LS.badges, ['Founder’s Crown', 'Neon Halo'])
@@ -199,6 +204,7 @@ export async function listBadge(userId: string, userName: string, badge: string,
 
 /** Achat atomique : débit acheteur + livraison + clôture, indivisible. */
 export async function buyListing(userId: string, listingId: string): Promise<{ wallet: Wallet; badge: string }> {
+  ensureCanInteract()
   if (DEMO_MODE) {
     const listings = read<MarketListing[]>(LS.listings, SEED_LISTINGS)
     const listing = listings.find((l) => l.id === listingId)
@@ -251,6 +257,7 @@ export async function fetchProfileViews(targetId: string): Promise<ProfileView[]
 
 /** Dépense des Sparks pour révéler un visiteur (sink déflationniste). */
 export async function revealViewer(userId: string, viewId: string, cost = 50): Promise<{ wallet: Wallet; viewer: string }> {
+  ensureCanInteract()
   if (DEMO_MODE) {
     const w = demoWallet(userId)
     if (w.sparks < cost) throw new Error('Solde insuffisant')

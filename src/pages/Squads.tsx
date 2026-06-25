@@ -5,6 +5,7 @@ import { Lock, Plus, Users, X } from 'lucide-react'
 import type { Squad } from '@/lib/types'
 import { DEMO_SQUADS } from '@/lib/demoData'
 import { createTeuf, getTeufs } from '@/lib/social'
+import { blockIfGuest } from '@/lib/guard'
 import { DEMO_MANGA_CLANS } from '@/lib/otaku'
 import { MEDIA, squadCover } from '@/lib/media'
 import { SmartImage } from '@/components/SmartImage'
@@ -26,6 +27,7 @@ export default function Squads() {
   const [name, setName] = useState('')
 
   function create() {
+    if (blockIfGuest()) return
     const n = name.trim()
     if (!n) return
     haptic([10, 30, 10])

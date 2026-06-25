@@ -298,6 +298,21 @@ begin
 end;
 $$;
 
+-- Supprime le compte INVITÉ courant (et ses données en cascade).
+-- Un compte invité n'est valable que pour UNE session : s'il n'est pas
+-- converti (finalize_username → is_guest=false), il est effacé à la
+-- déconnexion. Ne supprime jamais un compte déjà finalisé (garde-fou).
+create or replace function public.delete_my_guest()
+returns void
+language plpgsql
+security definer
+as $$
+begin
+  delete from public.profiles
+   where id = auth.uid() and is_guest = true;
+end;
+$$;
+
 -- Maintien des compteurs de likes
 create or replace function public.bump_like() returns trigger language plpgsql as $$
 begin

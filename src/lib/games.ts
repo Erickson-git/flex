@@ -1,4 +1,5 @@
 import { DEMO_MODE, supabase } from './supabase'
+import { ensureCanInteract } from './guard'
 
 // ─────────────────────────────────────────────────────────────
 // Pôle Gaming — scores & classement (cf. games.sql).
@@ -13,6 +14,7 @@ export interface LeaderRow {
 }
 
 export async function submitScore(userId: string, game: string, score: number): Promise<void> {
+  ensureCanInteract()
   if (DEMO_MODE || score <= 0) return
   try {
     await supabase!.from('game_scores').insert({ user_id: userId, game, score })

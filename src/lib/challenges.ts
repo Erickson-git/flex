@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { ensureCanInteract } from './guard'
 
 // ─────────────────────────────────────────────────────────────
 // Cercle des Défis — gagner un défi débloque une fonctionnalité
@@ -56,6 +57,7 @@ export async function createChallenge(
   input: { title: string; description: string; reward_feature: string; reward_days: number; hours: number },
   creatorId: string,
 ): Promise<void> {
+  ensureCanInteract()
   if (!supabase) throw new Error('Backend indisponible')
   const ends_at = new Date(Date.now() + input.hours * 3_600_000).toISOString()
   const { error } = await supabase.from('challenges').insert({
@@ -70,6 +72,7 @@ export async function createChallenge(
 }
 
 export async function joinChallenge(challengeId: string, userId: string): Promise<void> {
+  ensureCanInteract()
   if (!supabase) throw new Error('Backend indisponible')
   const { error } = await supabase.from('challenge_participants').insert({ challenge_id: challengeId, user_id: userId })
   if (error && !String(error.message).toLowerCase().includes('duplicate')) throw error
@@ -87,6 +90,7 @@ export async function fetchParticipants(challengeId: string): Promise<Participan
 }
 
 export async function declareWinner(challengeId: string, winnerId: string): Promise<void> {
+  ensureCanInteract()
   if (!supabase) throw new Error('Backend indisponible')
   const { error } = await supabase.rpc('declare_challenge_winner', { p_challenge: challengeId, p_winner: winnerId })
   if (error) throw error

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Profile } from '@/lib/types'
-import { ensureGuest as apiEnsureGuest, getCurrentProfile, signOut as apiSignOut } from '@/lib/api'
+import { deleteGuest as apiDeleteGuest, ensureGuest as apiEnsureGuest, getCurrentProfile, signOut as apiSignOut } from '@/lib/api'
+import { setGuestFlag } from '@/lib/guard'
 
 interface AuthState {
   me: Profile | null
@@ -13,27 +14,37 @@ interface AuthState {
   signOut: () => Promise<void>
 }
 
-export const useAuth = create<AuthState>((set) => ({
+export const useAuth = create<AuthState>((set, get) => ({
   me: null,
   loading: true,
   bootstrap: async () => {
     set({ loading: true })
     try {
       const me = await getCurrentProfile()
+      setGuestFlag(!!me?.is_guest)
       set({ me, loading: false })
     } catch {
+      setGuestFlag(false)
       set({ me: null, loading: false })
     }
   },
-  setMe: (p) => set({ me: p }),
+  setMe: (p) => {
+    setGuestFlag(!!p.is_guest)
+    set({ me: p })
+  },
   enterAsGuest: async () => {
     const me = await apiEnsureGuest()
+    setGuestFlag(!!me.is_guest)
     set({ me, loading: false })
     return me
   },
   signOut: async () => {
+    const me = get().me
     clearGhostTraces()
-    await apiSignOut()
+    // Compte invité non converti = valable une seule session → supprimé.
+    if (me?.is_guest) await apiDeleteGuest()
+    else await apiSignOut()
+    setGuestFlag(false)
     set({ me: null })
   },
 }))

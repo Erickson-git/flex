@@ -8,6 +8,7 @@ import {
 } from './demoData'
 import type { ChatMessage, DirectThread, Flex, Profile, SecretMessage } from './types'
 import { dicebear } from './media'
+import { ensureCanInteract } from './guard'
 import { starterBoost, tierFromRank, uid } from './utils'
 
 // ─────────────────────────────────────────────────────────────
@@ -209,6 +210,30 @@ export async function signOut(): Promise<void> {
   await supabase!.auth.signOut()
 }
 
+/**
+ * Supprime le compte INVITÉ courant puis déconnecte.
+ * Un compte invité n'est valable que pour une session : s'il n'a pas été
+ * converti (pseudo finalisé), il est effacé à la déconnexion.
+ */
+export async function deleteGuest(): Promise<void> {
+  if (DEMO_MODE) {
+    const me = read<Profile | null>(LS.session, null)
+    if (me) {
+      // Retire le profil invité du "monde" démo + sa session.
+      write(LS.profiles, demoProfiles().filter((p) => p.id !== me.id))
+    }
+    localStorage.removeItem(LS.session)
+    return
+  }
+  // Efface le profil (RPC security definer) avant de fermer la session.
+  try {
+    await supabase!.rpc('delete_my_guest')
+  } catch {
+    /* table/RPC absente : on déconnecte quand même */
+  }
+  await supabase!.auth.signOut()
+}
+
 // ═══════════════════════════════════════════════════════════════
 // FLEX FLOW (fil public)
 // ═══════════════════════════════════════════════════════════════
@@ -272,6 +297,7 @@ export async function createFlex(
   soundUrl: string | null = null,
   mediaUrls: string[] | null = null,
 ): Promise<Flex> {
+  ensureCanInteract()
   if (DEMO_MODE) {
     // Starification : le post du nouvel inscrit démarre déjà "chaud".
     const seedLikes = 40 + Math.floor(Date.now() % 120)
@@ -322,6 +348,7 @@ export async function fetchUserFlexes(userId: string): Promise<Flex[]> {
 
 /** Modifie le texte d'un Flex existant (auteur uniquement, RLS). */
 export async function updateFlexContent(flexId: string, content: string): Promise<void> {
+  ensureCanInteract()
   if (DEMO_MODE) {
     write(LS.flexes, demoFlexes().map((f) => (f.id === flexId ? { ...f, content } : f)))
     return
@@ -332,6 +359,7 @@ export async function updateFlexContent(flexId: string, content: string): Promis
 
 /** Supprime un Flex (auteur uniquement, RLS). */
 export async function deleteFlex(flexId: string): Promise<void> {
+  ensureCanInteract()
   if (DEMO_MODE) {
     write(LS.flexes, demoFlexes().filter((f) => f.id !== flexId))
     return
@@ -342,6 +370,7 @@ export async function deleteFlex(flexId: string): Promise<void> {
 
 /** Verrouille (hash PIN) ou déverrouille (null) un Flex existant. */
 export async function setFlexPin(flexId: string, pinHash: string | null): Promise<void> {
+  ensureCanInteract()
   if (DEMO_MODE) {
     write(LS.flexes, demoFlexes().map((f) => (f.id === flexId ? { ...f, pin_hash: pinHash } : f)))
     return
@@ -352,6 +381,7 @@ export async function setFlexPin(flexId: string, pinHash: string | null): Promis
 
 /** Like / "Flex" optimiste. Renvoie le nouvel état liké. */
 export async function toggleFlexLike(flexId: string, currentlyLiked: boolean): Promise<boolean> {
+  ensureCanInteract()
   if (DEMO_MODE) {
     const likes = read<Record<string, boolean>>(LS.likes, {})
     const next = !currentlyLiked
@@ -462,6 +492,7 @@ export async function sendRoomMessage(
   reply: { id: string; preview: string } | null = null,
   expiresAt: string | null = null,
 ): Promise<ChatMessage> {
+  ensureCanInteract()
   const msg: ChatMessage = {
     id: uid(),
     room_id: roomId,
@@ -579,6 +610,7 @@ export async function touchDmThread(roomId: string, peerId: string, text: string
 
 /** Réagit à un message (toggle un emoji). */
 export async function reactMessage(messageId: string, emoji: string): Promise<void> {
+  ensureCanInteract()
   if (DEMO_MODE || !supabase) return
   try {
     await supabase.rpc('react_message', { p_id: messageId, p_emoji: emoji })
@@ -589,18 +621,21 @@ export async function reactMessage(messageId: string, emoji: string): Promise<vo
 
 /** Supprime son propre message. */
 export async function deleteMessage(messageId: string): Promise<void> {
+  ensureCanInteract()
   if (DEMO_MODE || !supabase) return
   await supabase.rpc('delete_message', { p_id: messageId })
 }
 
 /** Modifie le texte d'un de ses messages. */
 export async function editMessage(messageId: string, content: string): Promise<void> {
+  ensureCanInteract()
   if (DEMO_MODE || !supabase) return
   await supabase.rpc('edit_message', { p_id: messageId, p_content: content })
 }
 
 /** « Supprimer pour tout le monde » : laisse une trace « message supprimé ». */
 export async function tombstoneMessage(messageId: string): Promise<void> {
+  ensureCanInteract()
   if (DEMO_MODE || !supabase) return
   await supabase.rpc('tombstone_message', { p_id: messageId })
 }
@@ -630,6 +665,7 @@ export async function sendSecretMessage(
   ttlSeconds: number,
   me: Profile,
 ): Promise<SecretMessage> {
+  ensureCanInteract()
   const msg: SecretMessage = {
     id: uid(),
     hideout_id: hideoutId,

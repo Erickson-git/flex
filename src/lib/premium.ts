@@ -1,6 +1,7 @@
 import { DEMO_MODE, supabase } from './supabase'
 import { applyArenaDelta } from './economy'
 import type { Profile } from './types'
+import { ensureCanInteract } from './guard'
 import { uid } from './utils'
 
 // ─────────────────────────────────────────────────────────────
@@ -108,6 +109,7 @@ export async function submitOrder(
   provider: Provider,
   receiptDataUrl: string | null,
 ): Promise<PremiumOrder> {
+  ensureCanInteract()
   if (DEMO_MODE) {
     const order: PremiumOrder = {
       id: uid(),

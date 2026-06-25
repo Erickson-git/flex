@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { ensureCanInteract } from './guard'
 
 // Suivi : actions follow / unfollow + état (RLS : follows_*_self).
 export async function isFollowing(targetId: string, meId: string): Promise<boolean> {
@@ -13,12 +14,14 @@ export async function isFollowing(targetId: string, meId: string): Promise<boole
 }
 
 export async function followUser(targetId: string, meId: string): Promise<void> {
+  ensureCanInteract()
   if (!supabase) throw new Error('Backend indisponible')
   const { error } = await supabase.from('follows').insert({ follower_id: meId, following_id: targetId })
   if (error && !String(error.message).toLowerCase().includes('duplicate')) throw error
 }
 
 export async function unfollowUser(targetId: string, meId: string): Promise<void> {
+  ensureCanInteract()
   if (!supabase) throw new Error('Backend indisponible')
   const { error } = await supabase.from('follows').delete().eq('follower_id', meId).eq('following_id', targetId)
   if (error) throw error

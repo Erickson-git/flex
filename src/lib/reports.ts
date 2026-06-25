@@ -1,5 +1,6 @@
 import { DEMO_MODE, supabase } from './supabase'
 import type { Report } from './types'
+import { ensureCanInteract } from './guard'
 import { uid } from './utils'
 
 // ─────────────────────────────────────────────────────────────
@@ -24,6 +25,7 @@ export async function submitReport(
   reason: string,
   details?: string,
 ): Promise<void> {
+  ensureCanInteract()
   if (DEMO_MODE) {
     const all = JSON.parse(localStorage.getItem(LS) || '[]') as Report[]
     all.unshift({ id: uid(), target_type: targetType, target_id: targetId, reason, status: 'open', created_at: new Date().toISOString() })

@@ -1,4 +1,5 @@
 import { DEMO_MODE, supabase } from './supabase'
+import { ensureCanInteract } from './guard'
 
 export interface CallLog {
   id: string
@@ -25,6 +26,7 @@ export async function recordCall(args: {
   status: string
   duration: number
 }): Promise<void> {
+  ensureCanInteract()
   if (DEMO_MODE || !supabase) return
   try {
     await supabase.rpc('record_call', {

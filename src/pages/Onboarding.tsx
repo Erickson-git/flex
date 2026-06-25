@@ -93,7 +93,8 @@ export default function Onboarding() {
         </button>
 
         <p className="text-center text-xs text-zinc-600">
-          L'invité peut tout regarder ; un pseudo est demandé pour publier ou commenter.
+          L'invité peut seulement regarder. Le compte invité disparaît à la
+          déconnexion — crée un compte pour interagir et le garder.
         </p>
       </motion.div>
     </div>
