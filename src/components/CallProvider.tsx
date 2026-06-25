@@ -7,6 +7,9 @@ import { ringtoneUrl } from '@/lib/audioLibrary'
 import { recordNotification } from '@/lib/notifications'
 import { recordCall } from '@/lib/calls'
 import { RTC_CONFIG } from '@/lib/rtc'
+import { sendRoomMessage, touchDmThread } from '@/lib/api'
+import { callPreview, encodeCall } from '@/lib/callMessage'
+import { dmRoomId } from '@/lib/utils'
 import { uploadMedia } from '@/lib/upload'
 import { saveToGallery } from '@/lib/gallery'
 import { useAuth } from '@/store/useAuth'
@@ -655,6 +658,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
         status: st,
         duration: durationRef.current,
       })
+      // Trace de l'appel DANS la conversation (façon WhatsApp) : un message
+      // d'appel posté une seule fois (côté appelant) → visible pour les deux.
+      const info = { kind: callKind as 'audio' | 'video', status: st as 'answered' | 'missed' | 'declined', duration: durationRef.current }
+      const room = dmRoomId(me.id, callee)
+      sendRoomMessage(room, encodeCall(info), null, me).catch(() => {})
+      touchDmThread(room, callee, callPreview(info)).catch(() => {})
     }
     pcRef.current?.close()
     pcRef.current = null

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, CheckCheck, ChevronLeft, Copy, CornerUpLeft, Download, Forward, ImagePlus, Loader2, Lock, Mic, Pencil, Phone, ScanFace, Search, Send, Smile, Timer, Trash2, Video, X } from 'lucide-react'
 import type { ChatMessage, Profile } from '@/lib/types'
+import { parseCall } from '@/lib/callMessage'
 import { editMessage, fetchRoomMessages, reactMessage, sendRoomMessage, subscribeRoom, tombstoneMessage, touchDmThread } from '@/lib/api'
 import { searchProfiles } from '@/lib/search'
 import { useAuth } from '@/store/useAuth'
@@ -501,6 +502,7 @@ export function ChatRoom({
           .map((m, idx, arr) => {
           const mine = m.author_id === me.id
           const sticker = m.content?.startsWith('sticker:') ? m.content.slice(8) : null
+          const call = parseCall(m.content)
           const prev = arr[idx - 1]
           const showDate = !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString()
           return (
@@ -521,7 +523,21 @@ export function ChatRoom({
                 onContextMenu={(e) => { e.preventDefault(); setActionMsg(m) }}
               >
                 {!mine && <div className="mb-0.5 ml-1 text-[11px] font-semibold text-zinc-500">{m.author_name}</div>}
-                {sticker ? (
+                {call ? (
+                  <div className={cn('flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5', mine ? 'bg-gold-grad text-ink-900' : 'glass text-zinc-100')}>
+                    {call.kind === 'video' ? <Video className="h-5 w-5 shrink-0" /> : <Phone className="h-5 w-5 shrink-0" />}
+                    <div className="leading-tight">
+                      <div className="text-sm font-semibold">
+                        {call.status === 'missed' ? 'Appel manqué' : call.status === 'declined' ? 'Appel refusé' : mine ? 'Appel sortant' : 'Appel entrant'}
+                      </div>
+                      <div className={cn('text-[11px]', call.status === 'answered' ? 'opacity-70' : mine ? 'opacity-70' : 'text-flex-pink')}>
+                        {call.status === 'answered'
+                          ? `${Math.floor(call.duration / 60)}:${String(call.duration % 60).padStart(2, '0')}`
+                          : call.kind === 'video' ? 'Vidéo' : 'Audio'}
+                      </div>
+                    </div>
+                  </div>
+                ) : sticker ? (
                   <div className={cn('text-6xl leading-none drop-shadow', mine ? 'text-right' : 'text-left')}>{sticker}</div>
                 ) : (
                   <div
@@ -545,7 +561,18 @@ export function ChatRoom({
                       ) : isAudioUrl(m.media_url) ? (
                         <div className="flex items-center gap-2 px-2.5 py-2">
                           <Mic className={cn('h-4 w-4 shrink-0', mine ? 'text-ink-900/70' : 'text-gold')} />
-                          <audio src={m.media_url} controls preload="metadata" className="h-9 w-52" />
+                          <audio
+                            src={m.media_url}
+                            controls
+                            preload="metadata"
+                            className="h-9 w-52"
+                            onPlay={(e) => {
+                              // Un seul audio à la fois : on coupe tous les autres.
+                              document.querySelectorAll('audio').forEach((a) => {
+                                if (a !== e.currentTarget) a.pause()
+                              })
+                            }}
+                          />
                         </div>
                       ) : (
                         <img src={m.media_url} alt="" className="w-60 object-cover" />
