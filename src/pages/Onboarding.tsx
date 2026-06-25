@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ChevronRight, Eye, Loader2, Sparkles } from 'lucide-react'
+import { Eye, Loader2, LogIn, Sparkles, UserPlus } from 'lucide-react'
 import { BrandLogo } from '@/components/BrandLogo'
 import { useAuth } from '@/store/useAuth'
 import { haptic } from '@/lib/utils'
@@ -54,24 +54,17 @@ export default function Onboarding() {
         transition={{ duration: 0.8, delay: 1.3 }}
         className="relative w-full max-w-sm space-y-3"
       >
-        {/* Nouveau compte */}
+        {/* 1 · Créer un compte */}
         <button
           onClick={() => { haptic(15); navigate('/claim') }}
-          className="btn-gold flex w-full items-center justify-center gap-2 text-lg"
+          disabled={busy}
+          className="btn-gold flex w-full items-center justify-center gap-2 text-lg disabled:opacity-60"
         >
-          Créer mon pseudo
-          <ChevronRight className="h-5 w-5" />
+          <UserPlus className="h-5 w-5" />
+          Créer un compte
         </button>
 
-        {/* Compte existant */}
-        <button
-          onClick={() => { haptic(10); navigate('/signin') }}
-          className="w-full rounded-2xl border border-white/15 py-3.5 text-sm font-bold text-white active:scale-[0.98]"
-        >
-          Se connecter
-        </button>
-
-        {/* Invité */}
+        {/* 2 · Compte invité */}
         <button
           onClick={async () => {
             haptic(10)
@@ -84,15 +77,19 @@ export default function Onboarding() {
             }
           }}
           disabled={busy}
-          className="flex w-full items-center justify-center gap-2 py-2 text-sm font-semibold text-zinc-400 active:scale-[0.98] disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-flex-cyan/30 bg-flex-cyan/[0.06] py-3.5 text-sm font-bold text-flex-cyan active:scale-[0.98] disabled:opacity-60"
         >
-          {busy ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <>
-              <Eye className="h-4 w-4" /> Visiter en invité
-            </>
-          )}
+          {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Eye className="h-5 w-5" /> Continuer en invité</>}
+        </button>
+
+        {/* 3 · Se connecter à un compte existant */}
+        <button
+          onClick={() => { haptic(10); navigate('/signin') }}
+          disabled={busy}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 py-3.5 text-sm font-bold text-white active:scale-[0.98] disabled:opacity-60"
+        >
+          <LogIn className="h-5 w-5" />
+          J'ai déjà un compte
         </button>
 
         <p className="text-center text-xs text-zinc-600">
