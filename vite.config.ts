@@ -14,7 +14,7 @@ export default defineConfig({
       // 'autoUpdate' : la nouvelle version s'applique automatiquement au prochain
       // chargement (fini les versions périmées coincées en cache).
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'logo.jpg', 'icons/*.jpg'],
+      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'logo.jpg', 'icons/*.png'],
       manifest: {
         name: 'FLEX',
         short_name: 'FLEX',
@@ -27,10 +27,9 @@ export default defineConfig({
         start_url: '/',
         categories: ['social', 'lifestyle'],
         icons: [
-          { src: '/icons/icon-192.jpg', sizes: '192x192', type: 'image/jpeg' },
-          { src: '/icons/icon-512.jpg', sizes: '512x512', type: 'image/jpeg' },
-          { src: '/logo.jpg', sizes: '512x512', type: 'image/jpeg', purpose: 'any' },
-          { src: '/logo.jpg', sizes: '512x512', type: 'image/jpeg', purpose: 'maskable' },
+          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
