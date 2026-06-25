@@ -10,6 +10,7 @@ import { RTC_CONFIG } from '@/lib/rtc'
 import { sendRoomMessage, touchDmThread } from '@/lib/api'
 import { callPreview, encodeCall } from '@/lib/callMessage'
 import { dmRoomId } from '@/lib/utils'
+import { CallChatOverlay } from './CallChatOverlay'
 import { uploadMedia } from '@/lib/upload'
 import { saveToGallery } from '@/lib/gallery'
 import { useAuth } from '@/store/useAuth'
@@ -893,6 +894,11 @@ function CallOverlay({
         <div className="safe-top absolute left-4 top-4 z-20 flex items-center gap-1.5 rounded-full bg-flex-pink/90 px-3 py-1 text-xs font-bold text-white">
           <Circle className="h-2.5 w-2.5 animate-pulse fill-current" /> REC
         </div>
+      )}
+      {videoConnected && (
+        <CallChatOverlay
+          lines={chatMsgs.map((m, i) => ({ id: String(i), text: m.text, mine: m.from === 'me', name: m.from === 'me' ? 'Toi' : peer.name }))}
+        />
       )}
       {videoConnected ? (
         <>

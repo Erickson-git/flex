@@ -18,6 +18,7 @@ import {
 import { notifyUser } from '@/lib/push'
 import { recordNotification } from '@/lib/notifications'
 import { Avatar } from '@/components/Avatar'
+import { CallChatOverlay } from '@/components/CallChatOverlay'
 import { cn, haptic } from '@/lib/utils'
 
 import { RTC_CONFIG as RTC } from '@/lib/rtc'
@@ -301,11 +302,19 @@ export default function GroupCallRoom() {
         })}
       </div>
 
-      {/* Barre de contrôles minimale : tout le reste est dans le menu Options */}
-      <div className="safe-bottom flex items-center justify-center gap-6 px-4 pb-6 pt-3">
+      {/* Messages flottants « live TikTok » par-dessus la vidéo */}
+      <CallChatOverlay lines={chat.map((m) => ({ id: m.id, name: m.name, text: m.text, mine: m.from === me?.id }))} />
+
+      {/* Barre de contrôles */}
+      <div className="safe-bottom flex items-center justify-center gap-4 px-4 pb-6 pt-3">
         <button onClick={toggleMute} className="grid h-14 w-14 place-items-center rounded-full bg-white/10 text-white active:scale-90">
           {muted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
         </button>
+        {amAdmin && (
+          <button onClick={() => setShowAdd(true)} aria-label="Ajouter des personnes" className="grid h-14 w-14 place-items-center rounded-full bg-flex-cyan/15 text-flex-cyan active:scale-90">
+            <UserPlus className="h-6 w-6" />
+          </button>
+        )}
         <button onClick={() => setShowOptions(true)} className="relative grid h-14 w-14 place-items-center rounded-full bg-white/10 text-white active:scale-90">
           <MoreHorizontal className="h-6 w-6" />
           {chat.length > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-flex-pink" />}
