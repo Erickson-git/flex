@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import { Crown, Loader2, MessageCircle, Mic, MicOff, MoreHorizontal, PhoneOff, Search, Send, Share2, UserPlus, Users, Video, VideoOff, X } from 'lucide-react'
+import { Crown, Loader2, MessageCircle, Mic, MicOff, MonitorUp, MoreHorizontal, PhoneOff, Search, Send, Share2, UserPlus, Users, Video, VideoOff, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/store/useAuth'
 import {
@@ -49,8 +49,10 @@ export default function GroupCallRoom() {
   const [chatText, setChatText] = useState('')
   const [full, setFull] = useState(false)
 
+  const [sharing, setSharing] = useState(false)
   const localRef = useRef<HTMLVideoElement>(null)
   const localStream = useRef<MediaStream | null>(null)
+  const screenRef = useRef<MediaStream | null>(null)
   const channel = useRef<RealtimeChannel | null>(null)
   const peers = useRef<Map<string, RTCPeerConnection>>(new Map())
   const membersRef = useRef<RoomMember[]>([])
@@ -211,6 +213,15 @@ export default function GroupCallRoom() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, me?.id])
 
+  // ADMIN : termine l'appel pour TOUS (chaque participant reçoit l'ordre de quitter).
+  function endForAll() {
+    members.forEach((m) => {
+      if (m.user_id !== me?.id) {
+        channel.current?.send({ type: 'broadcast', event: 'signal', payload: { from: me!.id, to: m.user_id, type: 'kicked' } })
+      }
+    })
+    hangup()
+  }
   function hangup() {
     navigate(-1)
   }
@@ -223,6 +234,40 @@ export default function GroupCallRoom() {
     const n = !camOff
     localStream.current?.getVideoTracks().forEach((t) => (t.enabled = !n))
     setCamOff(n)
+  }
+  // ── Partage d'écran : remplace la piste vidéo de chaque pair par l'écran,
+  //    sans renégociation (replaceTrack). Retour caméra à l'arrêt. ──
+  function stopScreen() {
+    screenRef.current?.getTracks().forEach((t) => t.stop())
+    screenRef.current = null
+    const cam = localStream.current?.getVideoTracks()[0]
+    peers.current.forEach((pc) => {
+      const s = pc.getSenders().find((x) => x.track?.kind === 'video')
+      if (s && cam) s.replaceTrack(cam).catch(() => {})
+    })
+    if (localRef.current) localRef.current.srcObject = localStream.current
+    setSharing(false)
+  }
+  async function startScreen() {
+    try {
+      const ds = await navigator.mediaDevices.getDisplayMedia({ video: true })
+      const track = ds.getVideoTracks()[0]
+      if (!track) return
+      screenRef.current = ds
+      peers.current.forEach((pc) => {
+        const s = pc.getSenders().find((x) => x.track?.kind === 'video')
+        if (s) s.replaceTrack(track).catch(() => {})
+      })
+      if (localRef.current) localRef.current.srcObject = ds
+      track.onended = () => stopScreen() // arrêt via la barre du navigateur
+      setSharing(true)
+    } catch {
+      /* partage refusé */
+    }
+  }
+  function toggleScreen() {
+    if (sharing) stopScreen()
+    else startScreen()
   }
   async function share() {
     haptic(12)
@@ -331,10 +376,16 @@ export default function GroupCallRoom() {
             {kind === 'video' && (
               <OptRow icon={camOff ? VideoOff : Video} label={camOff ? 'Activer la caméra' : 'Couper la caméra'} onClick={() => { toggleCam(); setShowOptions(false) }} />
             )}
+            {kind === 'video' && (
+              <OptRow icon={MonitorUp} label={sharing ? "Arrêter le partage d'écran" : "Partager mon écran"} onClick={() => { setShowOptions(false); toggleScreen() }} />
+            )}
             <OptRow icon={Share2} label="Partager le lien de l'appel" onClick={() => { setShowOptions(false); share() }} />
             {amAdmin && <OptRow icon={UserPlus} label="Ajouter quelqu'un (pseudo)" onClick={() => { setShowOptions(false); setShowAdd(true) }} />}
             <OptRow icon={MessageCircle} label="Messages de l'appel" onClick={() => { setShowOptions(false); setShowChat(true) }} />
             <OptRow icon={Users} label={`Participants (${members.length})`} onClick={() => { setShowOptions(false); setShowPanel(true) }} />
+            {amAdmin && (
+              <OptRow icon={PhoneOff} label="Terminer l'appel pour tout le monde" onClick={() => { setShowOptions(false); endForAll() }} />
+            )}
           </div>
         </div>
       )}

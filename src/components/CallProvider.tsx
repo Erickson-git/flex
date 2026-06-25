@@ -1,12 +1,14 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import { Circle, Layers, MessageSquare, Mic, MicOff, MoreHorizontal, Phone, PhoneOff, RefreshCw, Send, SwitchCamera, Video, VideoOff, X } from 'lucide-react'
+import { Circle, Layers, MessageSquare, Mic, MicOff, MoreHorizontal, Phone, PhoneOff, RefreshCw, Send, SwitchCamera, UserPlus, Video, VideoOff, X } from 'lucide-react'
 import { DEMO_MODE, supabase } from '@/lib/supabase'
 import { notifyUser } from '@/lib/push'
 import { ringtoneUrl } from '@/lib/audioLibrary'
 import { recordNotification } from '@/lib/notifications'
 import { recordCall } from '@/lib/calls'
 import { RTC_CONFIG } from '@/lib/rtc'
+import { useNavigate } from 'react-router-dom'
+import { createCallRoom, inviteMember } from '@/lib/groupCall'
 import { sendRoomMessage, touchDmThread } from '@/lib/api'
 import { callPreview, encodeCall } from '@/lib/callMessage'
 import { dmRoomId } from '@/lib/utils'
@@ -100,6 +102,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const recPeerRef = useRef('')
 
   const available = !!me && !DEMO_MODE && !!supabase
+  const navigate = useNavigate()
 
   // Sonnerie : joue la piste choisie pendant que ça sonne (entrant/sortant).
   useEffect(() => {
@@ -660,6 +663,31 @@ export function CallProvider({ children }: { children: ReactNode }) {
     cleanup()
   }
 
+  // Transforme l'appel 1-à-1 en APPEL DE GROUPE : crée une salle, invite le
+  // correspondant (notif + push), termine le 1-à-1 et ouvre la salle de groupe
+  // (où l'on peut ajouter d'autres participants et partager l'écran).
+  async function escalateToGroup() {
+    if (!peer || !me) return
+    const p = peer
+    try {
+      const roomId = await createCallRoom(callKind)
+      if (!roomId) return
+      await inviteMember(roomId, p.id)
+      const link = `/app/call/${roomId}`
+      notifyUser(p.id, `${me.display_name} t'invite à un appel de groupe`, 'Appuie pour rejoindre', link, 'callinvite:' + roomId)
+      recordNotification(p.id, 'call', 'Invitation à un appel', `${me.display_name} t'invite à un appel de groupe`, {
+        image: me.avatar_url,
+        link,
+        actorId: me.id,
+        actorName: me.display_name,
+      })
+      hangup()
+      navigate(link)
+    } catch {
+      /* indisponible */
+    }
+  }
+
   function cleanup() {
     // Fin d'appel côté APPELANT : notif "appel manqué" si jamais connecté ni
     // refusé, + push d'annulation pour fermer la notif d'appel chez le destinataire.
@@ -810,6 +838,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
           onSwitchKind={switchKind}
           chatMsgs={chatMsgs}
           onSendChat={sendCallChat}
+          onAddPeople={escalateToGroup}
           recording={recording}
           onToggleRecord={() => (recording ? stopCallRecording() : startCallRecording())}
         />
@@ -849,6 +878,7 @@ function CallOverlay({
   onSwitchKind,
   chatMsgs,
   onSendChat,
+  onAddPeople,
   recording,
   onToggleRecord,
 }: {
@@ -873,6 +903,7 @@ function CallOverlay({
   onSwitchKind: () => void
   chatMsgs: CallChatMsg[]
   onSendChat: (text: string) => void
+  onAddPeople: () => void
   recording: boolean
   onToggleRecord: () => void
 }) {
@@ -958,6 +989,11 @@ function CallOverlay({
             {status === 'connected' && (
               <button onClick={onToggleRecord} className={`grid h-14 w-14 place-items-center rounded-full text-white active:scale-90 ${recording ? 'bg-flex-pink' : 'bg-white/10'}`} aria-label="Enregistrer l'appel">
                 <Circle className={`h-6 w-6 ${recording ? 'fill-current' : ''}`} />
+              </button>
+            )}
+            {status === 'connected' && (
+              <button onClick={onAddPeople} className="grid h-14 w-14 place-items-center rounded-full bg-flex-cyan/15 text-flex-cyan active:scale-90" aria-label="Ajouter des personnes (appel de groupe)">
+                <UserPlus className="h-6 w-6" />
               </button>
             )}
             {(kind === 'video' || status === 'connected') && (
