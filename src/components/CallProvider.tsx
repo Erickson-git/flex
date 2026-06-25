@@ -146,8 +146,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   // (Ré)attache les flux aux éléments média à chaque changement d'état.
   useEffect(() => {
-    if (remoteVideo.current && remoteStream.current) remoteVideo.current.srcObject = remoteStream.current
-    if (remoteAudio.current && remoteStream.current) remoteAudio.current.srcObject = remoteStream.current
+    if (remoteVideo.current && remoteStream.current) {
+      remoteVideo.current.srcObject = remoteStream.current
+      remoteVideo.current.play().catch(() => {})
+    }
+    if (remoteAudio.current && remoteStream.current) {
+      remoteAudio.current.srcObject = remoteStream.current
+      remoteAudio.current.play().catch(() => {}) // autoplay peu fiable après srcObject
+    }
     if (localVideo.current && localStream.current) localVideo.current.srcObject = localStream.current
   }, [status, callKind])
 
@@ -199,8 +205,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
     pc.ontrack = (e) => {
       e.streams[0]?.getTracks().forEach((t) => remoteStream.current!.addTrack(t))
-      if (remoteVideo.current) remoteVideo.current.srcObject = remoteStream.current
-      if (remoteAudio.current) remoteAudio.current.srcObject = remoteStream.current
+      if (remoteVideo.current) {
+        remoteVideo.current.srcObject = remoteStream.current
+        remoteVideo.current.play().catch(() => {})
+      }
+      if (remoteAudio.current) {
+        remoteAudio.current.srcObject = remoteStream.current
+        remoteAudio.current.play().catch(() => {})
+      }
     }
     pc.onconnectionstatechange = () => {
       const s = pc.connectionState
@@ -870,7 +882,7 @@ function CallOverlay({
       )}
       {videoConnected ? (
         <>
-          <video ref={remoteVideo} autoPlay playsInline className="absolute inset-0 h-full w-full bg-black object-cover" />
+          <video ref={remoteVideo} autoPlay playsInline muted className="absolute inset-0 h-full w-full bg-black object-cover" />
           <video
             ref={localVideo}
             autoPlay
@@ -890,9 +902,12 @@ function CallOverlay({
             <span className="h-2 w-2 animate-pulse rounded-full bg-gold" />
             {label}
           </div>
-          <audio ref={remoteAudio} autoPlay />
         </div>
       )}
+      {/* Audio distant TOUJOURS monté (appels audio ET vidéo) → son fiable,
+          jamais coupé par le changement d'état/branche. La vidéo distante est
+          muette : tout le son sort d'ici. */}
+      <audio ref={remoteAudio} autoPlay playsInline />
 
       <div className="relative z-10 mt-auto flex items-center justify-center gap-8 pb-14 pt-6">
         {status === 'incoming' ? (
