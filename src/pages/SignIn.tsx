@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ChevronLeft, Eye, EyeOff, Loader2, ScanFace } from 'lucide-react'
 import { signInWithEmail } from '@/lib/account'
+import { takeRedirect } from '@/lib/redirect'
 import { biometricEnabled, biometricSupported, getFaceAccount, verifyBiometric } from '@/lib/biometric'
 import { useAuth } from '@/store/useAuth'
 import { BrandLogo } from '@/components/BrandLogo'
@@ -43,7 +44,7 @@ export default function SignIn() {
       // Le visage est reconnu : on restaure la session de cet appareil.
       await bootstrap()
       if (useAuth.getState().me) {
-        navigate('/app', { replace: true })
+        navigate(takeRedirect() ?? '/app', { replace: true })
       } else {
         setErr('Session expirée — connecte-toi une fois avec ton mot de passe.')
       }
@@ -64,7 +65,7 @@ export default function SignIn() {
       const email = id.includes('@') ? id : `${id.toLowerCase()}@flex.app`
       await signInWithEmail(email, pwd)
       await bootstrap()
-      navigate('/app', { replace: true })
+      navigate(takeRedirect() ?? '/app', { replace: true })
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Identifiants incorrects.')
       setBusy(false)

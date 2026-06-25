@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Eye, Loader2, LogIn, Sparkles, UserPlus } from 'lucide-react'
 import { BrandLogo } from '@/components/BrandLogo'
 import { useAuth } from '@/store/useAuth'
+import { takeRedirect } from '@/lib/redirect'
 import { haptic } from '@/lib/utils'
 
 /**
@@ -71,7 +72,7 @@ export default function Onboarding() {
             setBusy(true)
             try {
               await enterAsGuest()
-              navigate('/app', { replace: true })
+              navigate(takeRedirect() ?? '/app', { replace: true })
             } catch {
               setBusy(false)
             }

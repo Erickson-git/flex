@@ -20,6 +20,7 @@ import { Toaster } from '@/components/Toaster'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { BrandLogo } from '@/components/BrandLogo'
 import { isAdmin } from '@/lib/premium'
+import { rememberRedirect } from '@/lib/redirect'
 
 // Code-splitting : chaque page = un chunk chargé à la demande.
 const Onboarding = lazy(() => import('@/pages/Onboarding'))
@@ -67,22 +68,31 @@ function Splash() {
   )
 }
 
-/** Garde : redirige vers l'accueil si pas de profil. */
+/** Garde : redirige vers l'accueil/connexion si pas de profil (en mémorisant
+ *  le lien d'origine pour y revenir après connexion). */
 function Protected({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
+  const location = useLocation()
   if (loading) return <Splash />
-  if (!me) return <Navigate to="/" replace />
+  if (!me) {
+    rememberRedirect(location.pathname + location.search)
+    return <Navigate to="/" replace />
+  }
   return <>{children}</>
 }
 
 /**
- * Garde admin : non connecté → accueil ; connecté non-admin → /app.
+ * Garde admin : non connecté → accueil/connexion ; connecté non-admin → /app.
  * Le verrou réel reste la RLS Supabase (app_admins).
  */
 function AdminOnly({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
+  const location = useLocation()
   if (loading) return <Splash />
-  if (!me) return <Navigate to="/" replace />
+  if (!me) {
+    rememberRedirect(location.pathname + location.search)
+    return <Navigate to="/" replace />
+  }
   if (!isAdmin(me)) return <Navigate to="/app" replace />
   return <>{children}</>
 }

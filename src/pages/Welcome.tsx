@@ -6,6 +6,7 @@ import { useAuth } from '@/store/useAuth'
 import { useEconomy } from '@/store/useEconomy'
 import { PioneerBadge } from '@/components/PioneerBadge'
 import { Avatar } from '@/components/Avatar'
+import { takeRedirect } from '@/lib/redirect'
 import { haptic, tierLabel } from '@/lib/utils'
 
 /**
@@ -108,7 +109,7 @@ export default function Welcome() {
         transition={{ delay: 1 }}
         onClick={() => {
           haptic(15)
-          navigate('/app', { replace: true })
+          navigate(takeRedirect() ?? '/app', { replace: true })
         }}
         className="btn-gold mt-10 flex items-center gap-2 text-lg"
       >
