@@ -7,19 +7,18 @@ import { toast } from '@/lib/toast'
 const DEFAULT_PWD = '0000'
 
 /**
- * Les anciens comptes (créés avant la règle du mot de passe → aucun email ni
- * mot de passe) ne sont PLUS bloqués. On leur attribue silencieusement un mot
- * de passe par défaut « 0000 » (entièrement optionnel : modifiable à tout
- * moment depuis le profil) et on affiche une petite notification de rappel.
- * Aucun écran bloquant : le composant ne rend jamais d'interface.
+ * Aucun écran bloquant. Tout compte sans mot de passe (anciens comptes anonymes
+ * ET invités, qui ont chacun leur propre identifiant provisoire) reçoit
+ * silencieusement le mot de passe par défaut « 0000 » — entièrement optionnel,
+ * modifiable à tout moment depuis le profil. Chacun peut donc se reconnecter
+ * avec son pseudo + 0000. Le composant ne rend jamais d'interface.
  */
 export function PasswordGate() {
   const me = useAuth((s) => s.me)
   const handled = useRef(false)
 
   useEffect(() => {
-    // Invités et comptes déjà sécurisés : rien à faire.
-    if (!me || me.is_guest || handled.current) return
+    if (!me || handled.current) return
     handled.current = true
     let active = true
     ;(async () => {
@@ -29,7 +28,10 @@ export function PasswordGate() {
         // Connexion future possible par pseudo + 0000 (l'utilisateur changera
         // ce mot de passe quand il veut depuis « Sécuriser mon compte »).
         await secureAccount(`${me.username.toLowerCase()}@flex.app`, DEFAULT_PWD)
-        toast('Mot de passe par défaut : 0000 — change-le quand tu veux dans Profil.', 'info')
+        // Rappel discret pour les vrais comptes ; silencieux pour les invités.
+        if (!me.is_guest) {
+          toast('Mot de passe par défaut : 0000 — change-le quand tu veux dans Profil.', 'info')
+        }
       } catch {
         // Best-effort : en cas d'échec, on n'affiche rien et on ne bloque jamais.
         handled.current = false

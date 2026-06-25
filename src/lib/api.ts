@@ -131,11 +131,13 @@ export async function ensureGuest(): Promise<Profile> {
   if (DEMO_MODE) {
     const existing = read<Profile | null>(LS.session, null)
     if (existing) return existing
+    // Identifiant unique attribué à CET invité (sert de pseudo provisoire).
+    const code = uid().replace(/-/g, '').slice(0, 6).toUpperCase()
     const me: Profile = {
       id: uid(),
-      username: 'invite-' + uid().slice(0, 6),
-      display_name: 'Invité',
-      avatar_url: dicebear('invite'),
+      username: 'invite-' + code.toLowerCase(),
+      display_name: 'Invité-' + code,
+      avatar_url: dicebear('invite-' + code),
       bio: null,
       tier: 'member',
       joined_rank: 0,

@@ -226,6 +226,10 @@ alter table public.profiles add column if not exists is_guest boolean not null d
 
 -- Crée (ou renvoie) un profil INVITÉ pour l'utilisateur anonyme courant.
 -- Pseudo provisoire, rang 0 (ne consomme PAS de vrai rang tant que non finalisé).
+-- Chaque invité a son PROPRE identifiant unique (dérivé de son auth.uid) :
+--   username   = invite-<8 hex>      → sert de pseudo provisoire / de login
+--   display_name = Invité-<6 HEX>    → identifiant visible, unique par invité
+-- (le mot de passe par défaut « 0000 » est posé côté client : voir PasswordGate)
 create or replace function public.claim_guest()
 returns public.profiles
 language plpgsql
@@ -233,11 +237,17 @@ security definer
 as $$
 declare
   v_profile public.profiles;
+  v_code text := replace(auth.uid()::text, '-', '');
 begin
   select * into v_profile from public.profiles where id = auth.uid();
   if found then return v_profile; end if;
   insert into public.profiles (id, username, display_name, joined_rank, tier, is_guest)
-  values (auth.uid(), 'invite-' || substr(replace(auth.uid()::text, '-', ''), 1, 8), 'Invité', 0, 'member', true)
+  values (
+    auth.uid(),
+    'invite-' || substr(v_code, 1, 8),
+    'Invité-' || upper(substr(v_code, 1, 6)),
+    0, 'member', true
+  )
   returning * into v_profile;
   return v_profile;
 end;
