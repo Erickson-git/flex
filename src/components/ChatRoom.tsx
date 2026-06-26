@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, CheckCheck, ChevronLeft, Copy, CornerUpLeft, Download, Forward, ImagePlus, Loader2, Lock, Mic, Pencil, Phone, ScanFace, Search, Send, Smile, Timer, Trash2, Video, X } from 'lucide-react'
+import { Check, CheckCheck, ChevronLeft, Copy, CornerUpLeft, Download, Forward, ImagePlus, Loader2, Lock, Mic, MoreVertical, Pencil, Phone, ScanFace, Search, Send, Smile, Timer, Trash2, Video, X } from 'lucide-react'
 import type { ChatMessage, Profile } from '@/lib/types'
 import { parseCall } from '@/lib/callMessage'
 import { editMessage, fetchRoomMessages, reactMessage, sendRoomMessage, subscribeRoom, tombstoneMessage, touchDmThread } from '@/lib/api'
@@ -74,6 +74,7 @@ export function ChatRoom({
   const [editMsg, setEditMsg] = useState<ChatMessage | null>(null)
   const [unlocked, setUnlocked] = useState(() => !isChatLocked(roomId))
   const [searchOpen, setSearchOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [ephemeralSec, setEphemeralSec] = useState(() => getEphemeral(roomId))
   const [forwardMsg, setForwardMsg] = useState<ChatMessage | null>(null)
@@ -451,15 +452,6 @@ export function ChatRoom({
               subtitle && <div className="text-xs font-medium text-ink-900/70">{subtitle}</div>
             )}
           </div>
-          <button onClick={cycleEphemeral} aria-label="Messages éphémères" className="grid h-9 w-9 place-items-center rounded-full text-ink-900 active:scale-90">
-            <Timer className={cn('h-5 w-5', ephemeralSec > 0 ? '' : 'opacity-50')} />
-          </button>
-          <button onClick={() => { setSearchOpen((v) => !v); setSearch('') }} aria-label="Rechercher" className="grid h-9 w-9 place-items-center rounded-full text-ink-900 active:scale-90">
-            <Search className="h-5 w-5" />
-          </button>
-          <button onClick={toggleLock} aria-label="Verrouiller la conversation" className="grid h-9 w-9 place-items-center rounded-full text-ink-900 active:scale-90">
-            <Lock className={cn('h-5 w-5', isChatLocked(roomId) ? '' : 'opacity-50')} />
-          </button>
           {peer && callAvailable ? (
             <div className="flex items-center gap-1">
               <button onClick={() => startCall(peer, 'audio')} aria-label="Appel audio" className="grid h-9 w-9 place-items-center rounded-full text-ink-900 active:scale-90">
@@ -475,6 +467,10 @@ export function ChatRoom({
               LIVE
             </span>
           )}
+          {/* Menu : range proprement recherche / éphémère / verrou */}
+          <button onClick={() => setMenuOpen(true)} aria-label="Options de la conversation" className="grid h-9 w-9 place-items-center rounded-full text-ink-900 active:scale-90">
+            <MoreVertical className="h-5 w-5" />
+          </button>
         </div>
         {headerExtra}
       </header>
@@ -491,6 +487,44 @@ export function ChatRoom({
             className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-600"
           />
           <button onClick={() => { setSearchOpen(false); setSearch('') }} className="text-zinc-500"><X className="h-5 w-5" /></button>
+        </div>
+      )}
+
+      {/* Menu des options de la conversation (recherche / éphémère / verrou) */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-[80] flex items-end bg-ink-900/70 backdrop-blur-sm" onClick={() => setMenuOpen(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="glass w-full rounded-t-3xl p-4 pb-10">
+            <div className="mb-2 px-2 text-sm font-bold uppercase tracking-wider text-zinc-400">Options</div>
+            <button
+              onClick={() => { setMenuOpen(false); setSearchOpen(true); setSearch('') }}
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left active:bg-white/5"
+            >
+              <Search className="h-5 w-5 text-gold" />
+              <span className="font-semibold text-white">Rechercher dans la conversation</span>
+            </button>
+            <button
+              onClick={() => { cycleEphemeral() }}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-3 text-left active:bg-white/5"
+            >
+              <span className="flex items-center gap-3">
+                <Timer className="h-5 w-5 text-gold" />
+                <span className="font-semibold text-white">Messages éphémères</span>
+              </span>
+              <span className="text-xs font-bold text-zinc-400">
+                {ephemeralSec === 0 ? 'Désactivés' : ephemeralSec === 86400 ? '24 h' : '7 j'}
+              </span>
+            </button>
+            <button
+              onClick={() => { toggleLock() }}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-3 text-left active:bg-white/5"
+            >
+              <span className="flex items-center gap-3">
+                <Lock className="h-5 w-5 text-gold" />
+                <span className="font-semibold text-white">Verrouiller la conversation</span>
+              </span>
+              <span className="text-xs font-bold text-zinc-400">{isChatLocked(roomId) ? 'Activé' : 'Désactivé'}</span>
+            </button>
+          </div>
         </div>
       )}
 
