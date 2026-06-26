@@ -5,7 +5,7 @@ import { useAuth } from '@/store/useAuth'
 import { useEconomy } from '@/store/useEconomy'
 import { evaluateOrchestrator, recordSignal } from '@/lib/orchestrator'
 import { touchActive } from '@/lib/economy'
-import { syncPushIfGranted } from '@/lib/push'
+import { enablePush, pushPermission, pushSupported, syncPushIfGranted } from '@/lib/push'
 import { subscribeNotifications, syncAppBadge } from '@/lib/notifications'
 import { clearAppBadge } from '@/lib/badge'
 import { maybeShowFeatureTip, markFeatureSeenByLink } from '@/lib/featureTips'
@@ -185,6 +185,16 @@ export default function App() {
     touchActive()
     recordSignal('open')
     syncPushIfGranted().catch(() => {})
+    // Notifications : on les active automatiquement UNE fois (pour recevoir les
+    // APPELS même quand FLEX est fermé, comme WhatsApp). Best-effort.
+    try {
+      if (pushSupported() && pushPermission() === 'default' && !localStorage.getItem('flex.pushAsked')) {
+        localStorage.setItem('flex.pushAsked', '1')
+        enablePush().catch(() => {})
+      }
+    } catch {
+      /* ignore */
+    }
     // Rappels automatiques des fonctionnalités (auto-limités à 1 / 6 h).
     maybeShowFeatureTip(me).catch(() => {})
     const t = setInterval(() => {
