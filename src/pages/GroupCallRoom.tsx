@@ -53,6 +53,8 @@ export default function GroupCallRoom() {
   const localRef = useRef<HTMLVideoElement>(null)
   const localStream = useRef<MediaStream | null>(null)
   const screenRef = useRef<MediaStream | null>(null)
+  const presentRef = useRef<string[]>([]) // membres présents (pour le watchdog)
+  const watchdog = useRef<number | null>(null)
   const channel = useRef<RealtimeChannel | null>(null)
   const peers = useRef<Map<string, RTCPeerConnection>>(new Map())
   const membersRef = useRef<RoomMember[]>([])
@@ -117,6 +119,7 @@ export default function GroupCallRoom() {
     function onPresence(ch: RealtimeChannel) {
       const state = ch.presenceState() as Record<string, unknown[]>
       const present = Object.keys(state)
+      presentRef.current = present
       refreshMembers()
       present.forEach((pid) => {
         if (pid === me!.id || peers.current.has(pid)) return
@@ -204,10 +207,26 @@ export default function GroupCallRoom() {
         if (st === 'SUBSCRIBED') await ch.track({ id: me!.id, name: me!.display_name, avatar: me!.avatar_url })
       })
       channel.current = ch
+
+      // WATCHDOG : boucle qui garantit que l'appel « passe » chez tout le monde.
+      // Toutes les 4 s : on recrée les pairs perdus pour chaque participant
+      // présent, et on relance l'ICE des pairs qui décrochent (récupération).
+      watchdog.current = window.setInterval(() => {
+        presentRef.current.forEach((pid) => {
+          if (pid === me!.id) return
+          const pc = peers.current.get(pid)
+          if (!pc) {
+            if (me!.id < pid) createPeer(pid, true) // règle d'initiation (plus petit id)
+          } else if (pc.connectionState === 'disconnected' && me!.id < pid) {
+            try { pc.restartIce?.() } catch { /* ignore */ }
+          }
+        })
+      }, 4000)
     })()
 
     return () => {
       active = false
+      if (watchdog.current) clearInterval(watchdog.current)
       leave()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
