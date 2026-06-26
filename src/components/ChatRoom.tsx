@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, CheckCheck, ChevronLeft, Copy, CornerUpLeft, Download, Forward, ImagePlus, Loader2, Lock, Mic, MoreVertical, Pencil, Phone, ScanFace, Search, Send, Smile, Timer, Trash2, Video, X } from 'lucide-react'
+import { Check, CheckCheck, ChevronLeft, Copy, CornerUpLeft, Download, Forward, ImagePlus, Loader2, Lock, Mic, MoreVertical, Pencil, Phone, ScanFace, Search, Send, Share2, Smile, Timer, Trash2, Video, X } from 'lucide-react'
 import type { ChatMessage, Profile } from '@/lib/types'
 import { parseCall } from '@/lib/callMessage'
 import { editMessage, fetchRoomMessages, reactMessage, sendRoomMessage, subscribeRoom, tombstoneMessage, touchDmThread } from '@/lib/api'
@@ -241,6 +241,23 @@ export function ChatRoom({
       toastOk('Transféré à @' + p.username)
     } catch {
       setSendErr(true)
+    }
+    setForwardMsg(null)
+    setFwdQuery('')
+    setFwdResults([])
+  }
+
+  // Partage HORS de FLEX (vers n'importe qui : WhatsApp, SMS… via le partage natif).
+  async function shareExternally() {
+    if (!forwardMsg) return
+    const text = forwardMsg.content || 'Partagé depuis FLEX ✦'
+    const url = forwardMsg.media_url || undefined
+    try {
+      if (navigator.share) await navigator.share({ title: 'FLEX', text, url })
+      else await navigator.clipboard.writeText([text, url].filter(Boolean).join(' '))
+      toastOk('Partagé')
+    } catch {
+      /* annulé */
     }
     setForwardMsg(null)
     setFwdQuery('')
@@ -878,6 +895,13 @@ export function ChatRoom({
                 autoCapitalize="none"
               />
             </div>
+            {/* Vers n'importe qui, même hors de FLEX */}
+            <button
+              onClick={shareExternally}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-flex-cyan/30 bg-flex-cyan/[0.06] py-3 text-sm font-bold text-flex-cyan active:scale-[0.98]"
+            >
+              <Share2 className="h-4 w-4" /> Partager hors de FLEX
+            </button>
             <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
               {fwdResults.filter((p) => p.id !== me.id).map((p) => (
                 <button key={p.id} onClick={() => doForward(p)} className="flex w-full items-center gap-3 rounded-2xl border border-white/5 bg-ink-900/40 p-2.5 text-left active:scale-[0.99]">
