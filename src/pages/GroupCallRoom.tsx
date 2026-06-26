@@ -163,6 +163,18 @@ export default function GroupCallRoom() {
       }
     }
 
+    // Retire UN SEUL participant (celui qui a quitté) sans toucher aux autres.
+    function removePeer(pid?: string) {
+      if (!pid || pid === me!.id) return
+      const pc = peers.current.get(pid)
+      if (pc) {
+        pc.close()
+        peers.current.delete(pid)
+      }
+      presentRef.current = presentRef.current.filter((x) => x !== pid)
+      setRemotes((r) => r.filter((x) => x.id !== pid))
+    }
+
     function leave() {
       peers.current.forEach((pc) => pc.close())
       peers.current.clear()
@@ -202,6 +214,7 @@ export default function GroupCallRoom() {
       })
       ch.on('presence', { event: 'sync' }, () => onPresence(ch))
       ch.on('broadcast', { event: 'signal' }, ({ payload }) => onSignal(payload as SignalMsg))
+      ch.on('broadcast', { event: 'left' }, ({ payload }) => removePeer((payload as { id?: string })?.id))
       ch.on('broadcast', { event: 'chat' }, ({ payload }) => active && setChat((c) => [...c, payload as { id: string; from: string; name: string; text: string }]))
       ch.subscribe(async (st) => {
         if (st === 'SUBSCRIBED') await ch.track({ id: me!.id, name: me!.display_name, avatar: me!.avatar_url })
@@ -242,6 +255,13 @@ export default function GroupCallRoom() {
     hangup()
   }
   function hangup() {
+    // On prévient les autres qu'on quitte → ils nous retirent TOUT DE SUITE
+    // sans que LEUR appel se coupe. (L'appel ne s'arrête que pour nous.)
+    try {
+      channel.current?.send({ type: 'broadcast', event: 'left', payload: { id: me?.id } })
+    } catch {
+      /* ignore */
+    }
     navigate(-1)
   }
   function toggleMute() {
