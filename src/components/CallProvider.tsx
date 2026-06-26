@@ -34,13 +34,14 @@ type Status = 'idle' | 'outgoing' | 'incoming' | 'connected'
 
 interface SignalPayload {
   from: string
-  kind: 'invite' | 'answer' | 'ice' | 'hangup' | 'decline' | 'switch' | 'switch-answer' | 'reoffer' | 'reanswer' | 'chat'
+  kind: 'invite' | 'answer' | 'ice' | 'hangup' | 'decline' | 'switch' | 'switch-answer' | 'reoffer' | 'reanswer' | 'chat' | 'movetogroup'
   callKind?: CallKind
   name?: string
   avatar?: string | null
   sdp?: RTCSessionDescriptionInit
   candidate?: RTCIceCandidateInit
   text?: string
+  roomId?: string
 }
 
 interface CallChatMsg {
@@ -536,6 +537,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
       }
     } else if (p.kind === 'chat') {
       if (p.text) setChatMsgs((m) => [...m, { from: 'them', text: p.text! }])
+    } else if (p.kind === 'movetogroup') {
+      // Le correspondant fait basculer l'appel en GROUPE : on ferme le 1-à-1
+      // localement et on rejoint la salle de groupe (pas de coupure ressentie).
+      declinedRef.current = true // évite de marquer « appel manqué »
+      cleanup()
+      if (p.roomId) navigate(`/app/call/${p.roomId}`)
     } else if (p.kind === 'hangup' || p.kind === 'decline') {
       if (p.kind === 'decline') declinedRef.current = true
       cleanup()
@@ -674,14 +681,18 @@ export function CallProvider({ children }: { children: ReactNode }) {
       if (!roomId) return
       await inviteMember(roomId, p.id)
       const link = `/app/call/${roomId}`
-      notifyUser(p.id, `${me.display_name} t'invite à un appel de groupe`, 'Appuie pour rejoindre', link, 'callinvite:' + roomId)
-      recordNotification(p.id, 'call', 'Invitation à un appel', `${me.display_name} t'invite à un appel de groupe`, {
+      // Bascule FLUIDE : le correspondant reçoit l'ordre de rejoindre la salle de
+      // groupe (signal temps réel) → il y va automatiquement, SANS coupure brutale.
+      // (Notif + push en repli si son app n'est pas au premier plan.)
+      await signal(p.id, { kind: 'movetogroup', roomId })
+      notifyUser(p.id, `${me.display_name} passe en appel de groupe`, 'Appuie pour rejoindre', link, 'callinvite:' + roomId)
+      recordNotification(p.id, 'call', 'Appel de groupe', `${me.display_name} t'a basculé dans un appel de groupe`, {
         image: me.avatar_url,
         link,
         actorId: me.id,
         actorName: me.display_name,
       })
-      hangup()
+      cleanup() // ferme le 1-à-1 LOCALEMENT, sans envoyer de « hangup » au correspondant
       navigate(link)
     } catch {
       /* indisponible */
