@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import { Circle, Layers, MessageSquare, Mic, MicOff, MoreHorizontal, Phone, PhoneOff, RefreshCw, Send, SwitchCamera, UserPlus, Video, VideoOff, X } from 'lucide-react'
+import { ChevronDown, Circle, Layers, MessageSquare, Mic, MicOff, MoreHorizontal, Phone, PhoneOff, RefreshCw, Send, SwitchCamera, UserPlus, Video, VideoOff, X } from 'lucide-react'
 import { DEMO_MODE, supabase } from '@/lib/supabase'
 import { notifyUser } from '@/lib/push'
 import { ringtoneUrl } from '@/lib/audioLibrary'
@@ -13,6 +13,7 @@ import { sendRoomMessage, touchDmThread } from '@/lib/api'
 import { callPreview, encodeCall } from '@/lib/callMessage'
 import { dmRoomId } from '@/lib/utils'
 import { CallChatOverlay } from './CallChatOverlay'
+import { useEmojiBurst } from './EmojiBurst'
 import { uploadMedia } from '@/lib/upload'
 import { saveToGallery } from '@/lib/gallery'
 import { useAuth } from '@/store/useAuth'
@@ -34,7 +35,7 @@ type Status = 'idle' | 'outgoing' | 'incoming' | 'connected'
 
 interface SignalPayload {
   from: string
-  kind: 'invite' | 'answer' | 'ice' | 'hangup' | 'decline' | 'switch' | 'switch-answer' | 'reoffer' | 'reanswer' | 'chat' | 'movetogroup'
+  kind: 'invite' | 'answer' | 'ice' | 'hangup' | 'decline' | 'switch' | 'switch-answer' | 'reoffer' | 'reanswer' | 'chat' | 'movetogroup' | 'reaction'
   callKind?: CallKind
   name?: string
   avatar?: string | null
@@ -67,6 +68,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [peer, setPeer] = useState<{ id: string; name: string; avatar: string | null } | null>(null)
   const [callKind, setCallKind] = useState<CallKind>('audio')
   const [muted, setMuted] = useState(false)
+  const [minimized, setMinimized] = useState(false)
   const [duration, setDuration] = useState(0)
   const [cameraMode, setCameraMode] = useState<'front' | 'back' | 'dual'>('front')
   const [cameraOff, setCameraOff] = useState(false)
@@ -104,6 +106,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   const available = !!me && !DEMO_MODE && !!supabase
   const navigate = useNavigate()
+  const { blast } = useEmojiBurst()
+
+  // Réaction emoji : visible par les DEUX (burst local + signal au correspondant).
+  function sendReaction(emoji: string) {
+    blast(emoji)
+    if (peer) signal(peer.id, { kind: 'reaction', text: emoji })
+  }
 
   // Sonnerie : joue la piste choisie pendant que ça sonne (entrant/sortant).
   useEffect(() => {
@@ -170,7 +179,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       remoteAudio.current.play().catch(() => {}) // autoplay peu fiable après srcObject
     }
     if (localVideo.current && localStream.current) localVideo.current.srcObject = localStream.current
-  }, [status, callKind])
+  }, [status, callKind, minimized])
 
   // Compteur de durée d'appel (démarre à la connexion).
   useEffect(() => {
@@ -537,6 +546,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
       }
     } else if (p.kind === 'chat') {
       if (p.text) setChatMsgs((m) => [...m, { from: 'them', text: p.text! }])
+    } else if (p.kind === 'reaction') {
+      if (p.text) blast(p.text) // réaction reçue → visible aussi chez moi
     } else if (p.kind === 'movetogroup') {
       // Le correspondant fait basculer l'appel en GROUPE : on ferme le 1-à-1
       // localement et on rejoint la salle de groupe (pas de coupure ressentie).
@@ -774,6 +785,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setDuration(0)
     setCameraMode('front')
     setCameraOff(false)
+    setMinimized(false)
   }
 
   function toggleMute() {
@@ -850,6 +862,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
           chatMsgs={chatMsgs}
           onSendChat={sendCallChat}
           onAddPeople={escalateToGroup}
+          onReact={sendReaction}
+          minimized={minimized}
+          onMinimize={() => setMinimized(true)}
+          onExpand={() => setMinimized(false)}
           recording={recording}
           onToggleRecord={() => (recording ? stopCallRecording() : startCallRecording())}
         />
@@ -890,6 +906,10 @@ function CallOverlay({
   chatMsgs,
   onSendChat,
   onAddPeople,
+  onReact,
+  minimized,
+  onMinimize,
+  onExpand,
   recording,
   onToggleRecord,
 }: {
@@ -915,6 +935,10 @@ function CallOverlay({
   chatMsgs: CallChatMsg[]
   onSendChat: (text: string) => void
   onAddPeople: () => void
+  onReact: (emoji: string) => void
+  minimized: boolean
+  onMinimize: () => void
+  onExpand: () => void
   recording: boolean
   onToggleRecord: () => void
 }) {
@@ -930,14 +954,49 @@ function CallOverlay({
 
   const videoConnected = kind === 'video' && status === 'connected'
 
+  // Mode RÉDUIT : petite bulle flottante (n'occupe pas l'écran → on peut naviguer
+  // dans le reste de l'app). L'audio distant reste monté → l'appel continue.
+  if (minimized) {
+    return (
+      <>
+        <div
+          onClick={onExpand}
+          className="fixed left-3 top-16 z-[95] flex items-center gap-2 rounded-full bg-ink-900/90 py-1.5 pl-1.5 pr-3 shadow-card backdrop-blur active:scale-95"
+        >
+          <Avatar name={peer.name} url={peer.avatar} size={34} />
+          <div className="leading-tight">
+            <div className="text-xs font-bold text-white">{peer.name}</div>
+            <div className="text-[10px] text-emerald-400">{status === 'connected' ? fmtDur(duration) : label}</div>
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); onHangup() }}
+            className="ml-1 grid h-8 w-8 place-items-center rounded-full bg-flex-pink text-white active:scale-90"
+            aria-label="Raccrocher"
+          >
+            <PhoneOff className="h-4 w-4" />
+          </button>
+        </div>
+        {/* L'audio distant DOIT rester monté pour ne pas couper le son. */}
+        <audio ref={remoteAudio} data-call autoPlay playsInline />
+      </>
+    )
+  }
+
   return (
     <div className="fixed inset-0 z-[90] flex flex-col bg-ink-900">
+      <button
+        onClick={onMinimize}
+        aria-label="Réduire l'appel"
+        className="safe-top absolute left-4 top-4 z-20 grid h-10 w-10 place-items-center rounded-full bg-ink-900/50 text-white active:scale-90"
+      >
+        <ChevronDown className="h-6 w-6" />
+      </button>
       {recording && (
-        <div className="safe-top absolute left-4 top-4 z-20 flex items-center gap-1.5 rounded-full bg-flex-pink/90 px-3 py-1 text-xs font-bold text-white">
+        <div className="safe-top absolute left-1/2 top-4 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-flex-pink/90 px-3 py-1 text-xs font-bold text-white">
           <Circle className="h-2.5 w-2.5 animate-pulse fill-current" /> REC
         </div>
       )}
-      {videoConnected && (
+      {status === 'connected' && (
         <CallChatOverlay
           lines={chatMsgs.map((m, i) => ({ id: String(i), text: m.text, mine: m.from === 'me', name: m.from === 'me' ? 'Toi' : peer.name }))}
         />
@@ -972,6 +1031,13 @@ function CallOverlay({
           muette : tout le son sort d'ici. */}
       <audio ref={remoteAudio} data-call autoPlay playsInline />
 
+      {status === 'connected' && (
+        <div className="relative z-10 flex items-center justify-center gap-3 pb-1">
+          {['❤️', '😂', '🔥', '👏', '😮', '💯'].map((e) => (
+            <button key={e} onClick={() => onReact(e)} className="text-2xl transition active:scale-125" aria-label={`Réagir ${e}`}>{e}</button>
+          ))}
+        </div>
+      )}
       <div className="relative z-10 mt-auto flex items-center justify-center gap-8 pb-14 pt-6">
         {status === 'incoming' ? (
           <>

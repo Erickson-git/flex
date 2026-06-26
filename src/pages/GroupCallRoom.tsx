@@ -19,6 +19,7 @@ import { notifyUser } from '@/lib/push'
 import { recordNotification } from '@/lib/notifications'
 import { Avatar } from '@/components/Avatar'
 import { CallChatOverlay } from '@/components/CallChatOverlay'
+import { useEmojiBurst } from '@/components/EmojiBurst'
 import { cn, haptic } from '@/lib/utils'
 
 import { RTC_CONFIG as RTC } from '@/lib/rtc'
@@ -60,6 +61,13 @@ export default function GroupCallRoom() {
   const membersRef = useRef<RoomMember[]>([])
 
   const amAdmin = members.find((m) => m.user_id === me?.id)?.role === 'admin'
+  const { blast } = useEmojiBurst()
+
+  // Réaction emoji diffusée à TOUS les participants (burst local + broadcast).
+  function sendReaction(emoji: string) {
+    blast(emoji)
+    channel.current?.send({ type: 'broadcast', event: 'reaction', payload: { emoji } })
+  }
 
   useEffect(() => {
     membersRef.current = members
@@ -215,6 +223,7 @@ export default function GroupCallRoom() {
       ch.on('presence', { event: 'sync' }, () => onPresence(ch))
       ch.on('broadcast', { event: 'signal' }, ({ payload }) => onSignal(payload as SignalMsg))
       ch.on('broadcast', { event: 'left' }, ({ payload }) => removePeer((payload as { id?: string })?.id))
+      ch.on('broadcast', { event: 'reaction' }, ({ payload }) => { const e = (payload as { emoji?: string })?.emoji; if (e) blast(e) })
       ch.on('broadcast', { event: 'chat' }, ({ payload }) => active && setChat((c) => [...c, payload as { id: string; from: string; name: string; text: string }]))
       ch.subscribe(async (st) => {
         if (st === 'SUBSCRIBED') await ch.track({ id: me!.id, name: me!.display_name, avatar: me!.avatar_url })
@@ -388,6 +397,13 @@ export default function GroupCallRoom() {
 
       {/* Messages flottants « live TikTok » par-dessus la vidéo */}
       <CallChatOverlay lines={chat.map((m) => ({ id: m.id, name: m.name, text: m.text, mine: m.from === me?.id }))} />
+
+      {/* Réactions visibles par tous les participants */}
+      <div className="relative z-10 flex items-center justify-center gap-3 pb-1">
+        {['❤️', '😂', '🔥', '👏', '😮', '💯'].map((e) => (
+          <button key={e} onClick={() => sendReaction(e)} className="text-2xl transition active:scale-125" aria-label={`Réagir ${e}`}>{e}</button>
+        ))}
+      </div>
 
       {/* Barre de contrôles */}
       <div className="safe-bottom flex items-center justify-center gap-4 px-4 pb-6 pt-3">
